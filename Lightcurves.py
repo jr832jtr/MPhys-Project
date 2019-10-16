@@ -345,9 +345,9 @@ def noisylightcurve(lc, scatter):
     out = numpy.power(10, lognoisy)
     return out
 
-def simu_lx_sfr(n_gal, tmax=1e9, deltat=1e6, galpoppars=None, mstype='poly', mspars=None, lctype='lognorm', lcpars=None,
+def simu_lx_sfr(n_gal, bursterror, tmax=1e9, deltat=1e6, galpoppars=None, mstype='poly', mspars=None, lctype='lognorm', lcpars=None,
                 msigmapars=None, agnlctype='delay', agnlcpars=None, sbscale=10, sbbaseline=1, truncateedd=0.001,
-                skiplc=False, cannedgalaxies=True, rs_exp=False):
+                skiplc=False, cannedgalaxies=True, rs_exp=False): #bursterror argument is ME
     """
     All in one SFR-AGN simulation.
     @param n_gal:
@@ -390,13 +390,14 @@ def simu_lx_sfr(n_gal, tmax=1e9, deltat=1e6, galpoppars=None, mstype='poly', msp
         elif lctype == 'lognorm':
             lcpars = {'s': 1, 'stretch': 1e7}
         else:
-            raise MyExceptions.Hell("Shouldn't happen")
+            raise MyExceptions.Hell("Shouldn't happen")    
     if msigmapars is None:
         msigmapars = {}
     if agnlctype == 'delay':
         if 't_delay' not in agnlcpars.keys():
             agnlcpars['t_delay'] = 2e8
     elif agnlctype == 'random':
+        tmax += bursterror #ME
         if 'downtime' not in agnlcpars.keys():
             agnlcpars['downtime'] = 1e7
             agnlcpars['scalecutoff'] = 0
@@ -471,7 +472,10 @@ def simu_lx_sfr(n_gal, tmax=1e9, deltat=1e6, galpoppars=None, mstype='poly', msp
             lightcurves_sfr.append(tmp_lc)
     elif lctype == 'lognorm':
          for sfr in sfrs:
-            tmp_lc = lognorm_lightcurve(t_max=tmax, deltat=deltat, **lcpars)[1]
+            if agnlctype == 'random':
+                tmp_lc = lognorm_lightcurve(t_max=tmax, deltat=deltat, **lcpars)[1][int(bursterror/deltat):]
+            else:
+                tmp_lc = lognorm_lightcurve(t_max=tmax, deltat=deltat, **lcpars)[1]
             tmp_lc *= sfr * sbscale
              #tmp_lc = lognorm_lightcurve(t_max=tmax, deltat=deltat, scale=sfr * sbscale, **lcpars)[1]
              #if rs_exp:
@@ -487,10 +491,11 @@ def simu_lx_sfr(n_gal, tmax=1e9, deltat=1e6, galpoppars=None, mstype='poly', msp
         for _ledd, _lcsfr, _sfr in zip(ledd, lightcurves_sfr, sfrs):
             lightcurves_agn.append(delay(t, _lcsfr / _sfr, scale=_ledd, **agnlcpars)[1])
     elif agnlctype == 'random':
+        t = t[int(bursterror/deltat):] - bursterror #ME
         for _ledd in ledd:
             if agnlcpars['downtime'] < 1e7: #ME
                 raise Exception('Downtime less than 1e7 may lead to crash: downtime is hardwired for \'agnlctype = random\'') #ME
-            lightcurves_agn.append(random_burst(t_max=tmax, deltat=deltat, burstheight=_ledd, bursttype = 'lognorm', **agnlcpars)[1])
+            lightcurves_agn.append(random_burst(t_max=tmax, deltat=deltat, burstheight=_ledd, bursttype = 'lognorm', **agnlcpars)[1][int(bursterror/deltat):]) #ME
     elif agnlctype == 'prob_delta':
         for _ledd, _lcsfr, _sfr in zip(ledd, lightcurves_sfr, sfrs):
             lightcurves_agn.append(probabilistic_deltaburst(t, _lcsfr / _sfr, burstheight=_ledd,
