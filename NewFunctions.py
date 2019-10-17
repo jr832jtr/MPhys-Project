@@ -71,9 +71,9 @@ def delt(ngals, n, dn, dataset, deltat = 1e6, tmax = 1e9, Print = True, log_y = 
     return [scs.pearsonr(np.ravel(dataset['lc_agn'][:, n:(dn+1)]), np.ravel(dataset['lc_sfr'][:, n:(dn+1)])), scs.pearsonr(resultF, resultSF)]
 
 
-def Average(bins, data, ngals, name, savefigure = False):
+def Average(bins, data, ngals, name, log_y, savefigure = False):
     
-    fig, axez = plt.subplots(2, 1, figsize = (7, 10), sharex = True)
+    fig, axez = plt.subplots(2, 2, figsize = (14, 10), sharex = True)
 
     temp_lis = []
     for i in range(bins):
@@ -81,20 +81,27 @@ def Average(bins, data, ngals, name, savefigure = False):
     
     data['Groups'] = np.ravel(temp_lis)
 
-    data.groupby(data['Groups']).mean().plot(x = 'Time', y = list(np.arange(0,ngals,1)), ax = axez[0], marker = '.', linestyle = '', logy = True, legend = False, style = ['blue', 'green']*(ngals/2), title = 'Average Flux at {} bins for {}'.format(bins, name))
+    data.groupby(data['Groups']).mean().plot(x = 'Time', y = list(np.arange(0,ngals,1)), ax = axez[0, 0], marker = '.', linestyle = '', logy = True, legend = False, style = ['blue', 'green']*(ngals/2), title = 'Average Flux at {} bins for {}'.format(bins, name))
 
     temp_df = data.groupby(data['Groups']).mean()
     temp_df[temp_df > 0] = 1
     temp_df = temp_df.sum(axis = 1) - 1
 
-    axez[1].scatter(x = data.groupby(data['Groups']).mean()['Time'], y = temp_df, s = 24, marker = 'x', c = 'r');
-
-    plt.gca().set_title('Number of AGN with non-zero average flux for {}'.format(name));
-    plt.subplots_adjust(hspace = 0.2)
-    plt.gca().set_xlabel('Time');
-    plt.gca().set_ylabel('Count');
-    axez[0].set_ylabel('Average Flux');
+    axez[1, 0].scatter(x = data.groupby(data['Groups']).mean()['Time'], y = temp_df, s = 24, marker = 'x', c = 'r');
+    axez[0, 1].plot(data.groupby(data['Groups']).mean()['Time'], data.groupby(data['Groups']).mean().drop('Time', axis = 1).mean(axis = 1));
+    
+    axez[1, 0].set_title('Number of AGN with non-zero average flux for {}'.format(name));
+    axez[1, 0].set_xlabel('Time');
+    axez[1, 0].set_ylabel('Count');
+    axez[0, 0].set_ylabel('Average Flux');
               
+    axez[0, 1].set_title('Average of the Averages')
+    axez[0, 1].set_xlabel('Time')
+    axez[0, 1].set_ylabel('Average Flux')
+    axez[0, 1].set_yscale((lambda x: 'log' if x else 'linear')(log_y))
+        
+    plt.subplots_adjust(hspace = 0.2)
+        
     if savefigure:
         plt.savefig('AvgFlux{}.png'.format(name.split(' ')[0]))
         
