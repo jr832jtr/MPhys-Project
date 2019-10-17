@@ -12,7 +12,7 @@ def plot_marker(point, index, c, SubPlots, Graph = True):
     else:
         plt.axvline(x = point, color = c)
         
-def delt(ngals, n, dn, dataset, deltat = 1e6, tmax = 1e9, Print = True, log_y = True): #provides delta T plots and pearson coefficients
+def delt(ngals, n, dn, dataset, deltat = 1e6, tmax = 1e9, Print = True, log_y = True, FluxLog = True): #provides delta T plots and pearson coefficients
     
     if type(n) != int: #Exceptions, to avoid user input errors
         raise Exception('ERROR: n must be integer type')    
@@ -33,6 +33,13 @@ def delt(ngals, n, dn, dataset, deltat = 1e6, tmax = 1e9, Print = True, log_y = 
         
     deltaT = (dataset['t'][n:(dn + 1)] - (deltat*n)) #slicing is n:dn + 1 not inclusive! 1:100 gives 1 to 99
     deltaF = (dataset['lc_agn'][:, n:(dn + 1)]) 
+
+    if FluxLog == True:
+        resultF = np.log(deltaF[:, (dn - n)][deltaF[:, (dn - n)] != 0])
+        resultSF = np.log(dataset['lc_sfr'][:, dn][deltaF[:, (dn - n)] != 0])
+    elif FluxLog == False:
+        resultF = deltaF[:, (dn - n)]
+        resultSF = dataset['lc_sfr'][:, dn]
         
     if Print:
         
@@ -61,10 +68,8 @@ def delt(ngals, n, dn, dataset, deltat = 1e6, tmax = 1e9, Print = True, log_y = 
 
         plt.show()
     
-    return [scs.pearsonr(np.ravel(dataset['lc_agn'][:, n:(dn+1)]), np.ravel(dataset['lc_sfr'][:, n:(dn+1)])), scs.pearsonr(np.log(deltaF[:, (dn - n)][deltaF[:, (dn - n)] != 0]), np.log(dataset['lc_sfr'][:, dn][deltaF[:, (dn - n)] != 0]))]
+    return [scs.pearsonr(np.ravel(dataset['lc_agn'][:, n:(dn+1)]), np.ravel(dataset['lc_sfr'][:, n:(dn+1)])), scs.pearsonr(resultF, resultSF)]
 
-
-#Prob_Sim['lc_agn'][:, 200][Prob_Sim['lc_agn'][:, 200] != 0], Prob_Sim['lc_sfr'][:, 200][Prob_Sim['lc_agn'][:, 200] != 0])
 
 def Average(bins, data, ngals, name, savefigure = False):
     
