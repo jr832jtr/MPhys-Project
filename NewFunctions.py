@@ -68,7 +68,7 @@ def delt(ngals, n, dn, dataset, deltat = 1e6, tmax = 1e9, Print = True, log_y = 
 
         plt.show()
     
-    return [scs.pearsonr(np.ravel(dataset['lc_agn'][:, n:(dn+1)]), np.ravel(dataset['lc_sfr'][:, n:(dn+1)])), scs.pearsonr(resultF, resultSF)]
+    return [scs.pearsonr(np.ravel(dataset['lc_agn'][:, n:(dn+1)]), np.ravel(dataset['lc_sfr'][:, n:(dn+1)])), scs.pearsonr(resultF, resultSF), resultF, resultSF]
 
 
 def Average(bins, data, ngals, name, log_y, savefigure = False):
