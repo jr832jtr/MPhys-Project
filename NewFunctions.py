@@ -12,7 +12,7 @@ def plot_marker(point, index, c, SubPlots, Graph = True):
     else:
         plt.axvline(x = point, color = c)
         
-def delt(ngals, n, dn, dataset, deltat = 1e6, tmax = 1e9, Print = True, log_y = True, FluxLog = True): #provides delta T plots and pearson coefficients
+def delt(ngals, n, dn, dataset, corr, deltat = 1e6, tmax = 1e9, Print = True, log_y = True, FluxLog = True): #provides delta T plots and pearson coefficients
     
     if type(n) != int: #Exceptions, to avoid user input errors
         raise Exception('ERROR: n must be integer type')    
@@ -68,7 +68,10 @@ def delt(ngals, n, dn, dataset, deltat = 1e6, tmax = 1e9, Print = True, log_y = 
 
         plt.show()
     
-    return [scs.pearsonr(np.ravel(dataset['lc_agn'][:, n:(dn+1)]), np.ravel(dataset['lc_sfr'][:, n:(dn+1)])), scs.pearsonr(resultF, resultSF), resultF, resultSF]
+    if corr == 'Pearson':
+        return [scs.pearsonr(np.ravel(dataset['lc_agn'][:, n:(dn+1)]), np.ravel(dataset['lc_sfr'][:, n:(dn+1)])), scs.pearsonr(resultF, resultSF), resultF, resultSF]
+    elif corr == 'Spearman':
+        return [scs.spearmanr(np.ravel(dataset['lc_agn'][:, n:(dn+1)]), np.ravel(dataset['lc_sfr'][:, n:(dn+1)])), scs.spearmanr(resultF, resultSF), resultF, resultSF]
 
 
 def Average(bins, data, ngals, name, log_y, savefigure = False):
