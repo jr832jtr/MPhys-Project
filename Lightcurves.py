@@ -345,9 +345,7 @@ def noisylightcurve(lc, scatter):
     out = numpy.power(10, lognoisy)
     return out
 
-def simu_lx_sfr(n_gal, bursterror, tmax=1e9, deltat=1e6, galpoppars=None, mstype='poly', mspars=None, lctype='lognorm', lcpars=None,
-                msigmapars=None, agnlctype='delay', agnlcpars=None, sbscale=10, sbbaseline=1, truncateedd=0.001,
-                skiplc=False, cannedgalaxies=True, rs_exp=False): #bursterror argument is ME
+def simu_lx_sfr(n_gal, bursterror, tmax=1e9, deltat=1e6, galpoppars=None, mstype='poly', mspars=None, lctype='lognorm', lcpars=None, msigmapars=None, agnlctype='delay', agnlcpars=None, sbscale=10, sbbaseline=1, truncateedd=0.001, skiplc=False, cannedgalaxies=True, rs_exp=False): #bursterror argument is ME
     """
     All in one SFR-AGN simulation.
     @param n_gal:
@@ -473,7 +471,7 @@ def simu_lx_sfr(n_gal, bursterror, tmax=1e9, deltat=1e6, galpoppars=None, mstype
     elif lctype == 'lognorm':
          for sfr in sfrs:
             if agnlctype == 'random':
-                tmp_lc = lognorm_lightcurve(t_max=tmax, deltat=deltat, **lcpars)[1][int(bursterror/deltat):]
+                tmp_lc = lognorm_lightcurve(t_max=tmax - bursterror, deltat=deltat, **lcpars)[1]
             else:
                 tmp_lc = lognorm_lightcurve(t_max=tmax, deltat=deltat, **lcpars)[1]
             tmp_lc *= sfr * sbscale
