@@ -38,8 +38,8 @@ def delt(ngals, n, dn, dataset, corr, deltat = 1e6, tmax = 1e9, Print = True, lo
         resultF = np.log(deltaF[:, (dn - n)][deltaF[:, (dn - n)] != 0])
         resultSF = np.log(dataset['lc_sfr'][:, dn][deltaF[:, (dn - n)] != 0])
     elif FluxLog == False:
-        resultF = deltaF[:, (dn - n)]
-        resultSF = dataset['lc_sfr'][:, dn]
+        resultF = deltaF[:, (dn - n)][deltaF[:, (dn - n)] != 0]
+        resultSF = dataset['lc_sfr'][:, dn][deltaF[:, (dn - n)] != 0]
         
     if Print:
         
@@ -80,7 +80,7 @@ def Average(bins, data, ngals, name, log_y, savefigure = False):
 
     temp_lis = []
     for i in range(bins):
-        temp_lis.append([i]*(1000/bins))
+        temp_lis.append([i]*int(1000/bins))
     
     data['Groups'] = np.ravel(temp_lis)
 
@@ -110,4 +110,4 @@ def Average(bins, data, ngals, name, log_y, savefigure = False):
         
     plt.show()
                         
-    return None           
+    return None      
