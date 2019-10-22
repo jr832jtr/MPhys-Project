@@ -35,8 +35,8 @@ def delt(ngals, n, dn, dataset, corr, deltat = 1e6, tmax = 1e9, Print = True, lo
     deltaF = (dataset['lc_agn'][:, n:(dn + 1)]) 
 
     if FluxLog == True:
-        resultF = np.log(deltaF[:, (dn - n)][deltaF[:, (dn - n)] != 0])
-        resultSF = np.log(dataset['lc_sfr'][:, dn][deltaF[:, (dn - n)] != 0])
+        resultF = np.log10(deltaF[:, (dn - n)][deltaF[:, (dn - n)] != 0])
+        resultSF = np.log10(dataset['lc_sfr'][:, dn][deltaF[:, (dn - n)] != 0])
     elif FluxLog == False:
         resultF = deltaF[:, (dn - n)][deltaF[:, (dn - n)] != 0]
         resultSF = dataset['lc_sfr'][:, dn][deltaF[:, (dn - n)] != 0]
@@ -82,6 +82,7 @@ def Average(bins, data, ngals, name, log_y, savefigure = False):
     for i in range(bins):
         temp_lis.append([i]*int(1000/bins))
     
+    data[data == 0] = np.nan
     data['Groups'] = np.ravel(temp_lis)
 
     data.groupby(data['Groups']).mean().plot(x = 'Time', y = list(np.arange(0,ngals,1)), ax = axez[0, 0], marker = '.', linestyle = '', logy = True, legend = False, style = ['blue', 'green']*(ngals/2), title = 'Average Flux at {} bins for {}'.format(bins, name))
@@ -93,15 +94,23 @@ def Average(bins, data, ngals, name, log_y, savefigure = False):
     axez[1, 0].scatter(x = data.groupby(data['Groups']).mean()['Time'], y = temp_df, s = 24, marker = 'x', c = 'r');
     axez[0, 1].plot(data.groupby(data['Groups']).mean()['Time'], data.groupby(data['Groups']).mean().drop('Time', axis = 1).mean(axis = 1));
     
+    data[data.isna()] = 0.0
+    axez[1, 1].plot(data.groupby(data['Groups']).mean()['Time'], data.groupby(data['Groups']).mean().drop('Time', axis = 1).mean(axis = 1));
+    
     axez[1, 0].set_title('Number of AGN with non-zero average flux for {}'.format(name));
     axez[1, 0].set_xlabel('Time');
     axez[1, 0].set_ylabel('Count');
     axez[0, 0].set_ylabel('Average Flux');
               
-    axez[0, 1].set_title('Average of the Averages')
+    axez[0, 1].set_title('Average of the Averages: zeroes excluded')
     axez[0, 1].set_xlabel('Time')
     axez[0, 1].set_ylabel('Average Flux')
     axez[0, 1].set_yscale((lambda x: 'log' if x else 'linear')(log_y))
+    
+    axez[1, 1].set_title('Average of the Averages: zeroes included')
+    axez[1, 1].set_xlabel('Time')
+    axez[1, 1].set_ylabel('Average Flux')
+    axez[1, 1].set_yscale((lambda x: 'log' if x else 'linear')(log_y))
         
     plt.subplots_adjust(hspace = 0.2)
         
