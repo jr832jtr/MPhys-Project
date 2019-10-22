@@ -11,7 +11,7 @@ import MyCosmology
 import MyAstroCalc
 
 def lognorm_lightcurve(t_max, deltat, stretch=1, s=1, scale=1, loc=None, peakatone=False, norm=1):
-    t = numpy.arange(0, t_max, deltat)
+    t = numpy.arange(0, int(t_max), deltat)
     if loc is None:
         loc = 0.5*t_max
     f = scipy.stats.lognorm.pdf(t / stretch, s=s, loc=loc/stretch, scale=scale)
@@ -345,7 +345,9 @@ def noisylightcurve(lc, scatter):
     out = numpy.power(10, lognoisy)
     return out
 
-def simu_lx_sfr(n_gal, bursterror, tmax=1e9, deltat=1e6, galpoppars=None, mstype='poly', mspars=None, lctype='lognorm', lcpars=None, msigmapars=None, agnlctype='delay', agnlcpars=None, sbscale=10, sbbaseline=1, truncateedd=0.001, skiplc=False, cannedgalaxies=True, rs_exp=False): #bursterror argument is ME
+def simu_lx_sfr(n_gal, bursterror, tmax=1e9, deltat=1e6, galpoppars=None, mstype='poly', mspars=None, lctype='lognorm', lcpars=None,
+                msigmapars=None, agnlctype='delay', agnlcpars=None, sbscale=10, sbbaseline=1, truncateedd=0.001,
+                skiplc=False, cannedgalaxies=True, rs_exp=False): #bursterror argument is ME
     """
     All in one SFR-AGN simulation.
     @param n_gal:
@@ -469,9 +471,9 @@ def simu_lx_sfr(n_gal, bursterror, tmax=1e9, deltat=1e6, galpoppars=None, mstype
                 tmp_lc = rescale_exp(tmp_lc, rs_exp)
             lightcurves_sfr.append(tmp_lc)
     elif lctype == 'lognorm':
-         for sfr in sfrs:
+        for sfr in sfrs:
             if agnlctype == 'random':
-                tmp_lc = lognorm_lightcurve(t_max=tmax - bursterror, deltat=deltat, **lcpars)[1]
+                tmp_lc = lognorm_lightcurve(t_max=(tmax - bursterror), deltat=deltat, **lcpars)[1]
             else:
                 tmp_lc = lognorm_lightcurve(t_max=tmax, deltat=deltat, **lcpars)[1]
             tmp_lc *= sfr * sbscale
