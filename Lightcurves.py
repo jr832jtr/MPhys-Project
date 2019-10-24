@@ -110,7 +110,7 @@ def delay(t, f, t_delay=1e6, scale=1, baseline=0, randomheight=False, randdist='
     if ind_start > 0:
         f_out[0:ind_start] = baseline
     else:
-        print "Warning, delay is below resolution of data!"
+        print("Warning, delay is below resolution of data!")
     _n = len(t)
     #f_out = numpy.concatenate((numpy.empty(ind_start) * baseline, f[ind_start:]))
     for i in range(_n - ind_start):
@@ -430,10 +430,10 @@ def simu_lx_sfr(n_gal, bursterror, tmax=1e9, deltat=1e6, galpoppars=None, mstype
         mean_sfrs = getsample[:, 4]
     else:
         # draw random galaxies
-        print "Drawing galaxy sample....."
+        print("Drawing galaxy sample.....")
         m_gal = MyCosmology.random_schechter_l(n_gal, **galpoppars)
         # calculate sfrs
-        print "Getting Main Sequence calibration...."
+        print("Getting Main Sequence calibration....")
         if mstype == 'poly':
             sfrs, mean_sfrs = HostGalaxies.mgalsfr_poly(m_gal, **mspars)
         elif mstype == 'pl':
@@ -442,12 +442,12 @@ def simu_lx_sfr(n_gal, bursterror, tmax=1e9, deltat=1e6, galpoppars=None, mstype
             raise MyExceptions.Hell("One of those things that should not happen.")
         # calculate BH masses
         # calculate Eddington Luminosity
-        print "Getting black hole masses and Eddington luminosities....."
+        print("Getting black hole masses and Eddington luminosities.....")
         bhmass = HostGalaxies.msigma(m_gal, **msigmapars)
         ledd = MyAstroCalc.EddingtonLuminosity(10 ** bhmass)
     if skiplc:
         return {'m_gal': m_gal, 'sfr': sfrs, 'bhmass': bhmass, 'ledd': ledd}
-    print "Creating lightcurves...."
+    print("Creating lightcurves....")
     # simulate lightcurves using sfr as scaling (there might be an issue here of that not turning out quite fine)
     # this is not elegant, use numpy.outer instead of those silly loops
     lightcurves_sfr = []
@@ -485,7 +485,7 @@ def simu_lx_sfr(n_gal, bursterror, tmax=1e9, deltat=1e6, galpoppars=None, mstype
         raise MyExceptions.Hell("One of those things that should not happen.")
     peak_sfr = t[numpy.argmax(lightcurves_sfr[0])]
     # simulate
-    print "Creating AGN lightcurves...."
+    print("Creating AGN lightcurves....")
     lightcurves_agn = []
     if agnlctype == 'delay':
         for _ledd, _lcsfr, _sfr in zip(ledd, lightcurves_sfr, sfrs):
@@ -510,12 +510,12 @@ def simu_lx_sfr(n_gal, bursterror, tmax=1e9, deltat=1e6, galpoppars=None, mstype
                                                                **agnlcpars)[1])
     else:
         raise MyExceptions.Hell("One of those things that should not happen.")
-    print "Adding SF baseline..."
+    print("Adding SF baseline...")
     for lc, sf in zip(lightcurves_sfr, sfrs):
         lc += sf * sbbaseline
     truncated = numpy.zeros_like(lightcurves_agn)
     if truncateedd is not False:
-        print "Truncating AGN lightcurves....."
+        print("Truncating AGN lightcurves.....")
         for _lagn, _ledd, i in zip(lightcurves_agn, ledd, range(n_gal)):
             truncated[i] = truncate_agnlc(_lagn, _ledd * truncateedd)
     return {'m_gal': m_gal, 'sfr': sfrs, 'bhmass': bhmass, 'ledd': ledd, 'lc_sfr': numpy.array(lightcurves_sfr),
