@@ -142,12 +142,17 @@ class AGNSFR:
         
         for i in range(size[0]*size[1]):
             
-            if size[1] > size[0]:
-                axs[int(i/a), i%a].scatter(x = NewFunctions.delt(self.no_gals, 100, (900/(size[0]*size[1]))*(i+1), self.data, corr = Corr, Print = False, FluxLog = LogBool)[2], y = NewFunctions.delt(self.no_gals, 100, (900/(size[0]*size[1]))*(i+1), self.data, corr = Corr, Print = False, FluxLog = LogBool)[3])
+            if size[1] >= size[0]:
+                axs[int(i/a), i%a].scatter(x = NewFunctions.delt(self.no_gals, 100, 100 + (899/(size[0]*size[1]))*(i+1), self.data, corr = Corr, Print = False, FluxLog = LogBool)[2], y = NewFunctions.delt(self.no_gals, 100, 100 + (899/(size[0]*size[1]))*(i+1), self.data, corr = Corr, Print = False, FluxLog = LogBool)[3])
                 axs[int(i/a), i%a].set_xscale((lambda x: 'linear' if x else 'log')(LogBool))
+                axs[int(i/a), i%a].text(0.08, 0.9, '$\Delta$t = {0:.2f}e8'.format((8.99/(size[0]*size[1]))*(i+1)), transform = axs[int(i/a), i%a].transAxes, fontsize = 12)
+                
+                if i%a == 0:
+                    axs[int(i/a), i%a].set_ylabel((lambda x: 'log(SFR Flux)' if x else 'SFR Flux')(LogBool))
+                    axs[(i%a) + (a - 1), int(i/a)].set_xlabel(((lambda x: 'log(AGN Flux)' if x else 'AGN Flux')(LogBool)))
                 
             elif size[0] > size[1]:
-                axs[int(i/b), i%b].scatter(x = NewFunctions.delt(self.no_gals, 100, (900/(size[0]*size[1]))*(i+1), self.data, corr = Corr, Print = False, FluxLog = LogBool)[2], y = NewFunctions.delt(self.no_gals, 100, (900/(size[0]*size[1]))*(i+1), self.data, corr = Corr, Print = False, FluxLog = LogBool)[3])
+                axs[int(i/b), i%b].scatter(x = NewFunctions.delt(self.no_gals, 100, 100 + (899/(size[0]*size[1]))*(i+1), self.data, corr = Corr, Print = False, FluxLog = LogBool)[2], y = NewFunctions.delt(self.no_gals, 100, 100 + (899/(size[0]*size[1]))*(i+1), self.data, corr = Corr, Print = False, FluxLog = LogBool)[3])
                 axs[int(i/b), i%b].set_xscale((lambda x: 'linear' if x else 'log')(LogBool))
                 
     
