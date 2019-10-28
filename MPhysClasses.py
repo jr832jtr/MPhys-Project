@@ -143,25 +143,35 @@ class AGNSFR:
         for i in range(size[0]*size[1]):
             
             if a == 1 or b == 1:
-                axs[i].scatter(x = NewFunctions.delt(self.no_gals, 100, 100 + (899/(size[0]*size[1]))*(i+1), self.data, corr = Corr, Print = False, FluxLog = LogBool)[2], y = NewFunctions.delt(self.no_gals, 100, 100 + (899/(size[0]*size[1]))*(i+1), self.data, corr = Corr, Print = False, FluxLog = LogBool)[3])
-                
-            
+                Tuple = i
+                Tuple2 = i%a
+                Tuple3 = Tuple
             elif size[1] >= size[0]:
-                axs[int(i/a), i%a].scatter(x = NewFunctions.delt(self.no_gals, 100, 100 + (899/(size[0]*size[1]))*(i+1), self.data, corr = Corr, Print = False, FluxLog = LogBool)[2], y = NewFunctions.delt(self.no_gals, 100, 100 + (899/(size[0]*size[1]))*(i+1), self.data, corr = Corr, Print = False, FluxLog = LogBool)[3])
+                Tuple = int(i/a), i%a
+                Tuple2 = (b - 1), i%a
+                if i < a:
+                    Tuple3 = (b - 1), i
+            elif size[1] < size[0]:
+                Tuple = int(i/b), i%b
+                Tuple2 = (b - 1), i%b
+                if i < b:
+                    Tuple3 = (b - 1), i
                 
-                axs[int(i/a), i%a].set_xscale((lambda x: 'linear' if x else 'log')(LogBool))
-                axs[int(i/a), i%a].set_yscale((lambda x: 'linear' if x else 'log')(LogBool))
-                axs[int(i/a), i%a].text(0.08, 0.9, '$\Delta$t = {0:.2f}e8'.format((8.99/(size[0]*size[1]))*(i+1)), transform = axs[int(i/a), i%a].transAxes, fontsize = 12)
+            axs[Tuple].scatter(x = NewFunctions.delt(self.no_gals, 100, 100 + (899/(size[0]*size[1]))*(i+1), self.data, corr = Corr, Print = False, FluxLog = LogBool)[2], y = NewFunctions.delt(self.no_gals, 100, 100 + (899/(size[0]*size[1]))*(i+1), self.data, corr = Corr, Print = False, FluxLog = LogBool)[3])
                 
-                if i%a == 0:
-                    axs[int(i/a), i%a].set_ylabel((lambda x: 'log(SFR Flux)' if x else 'SFR Flux')(LogBool))
-                    axs[(b - 1), i%a].set_xlabel(((lambda x: 'log(AGN Flux)' if x else 'AGN Flux')(LogBool)))
-                elif i < a:
-                    axs[(b - 1), i].set_xlabel(((lambda x: 'log(AGN Flux)' if x else 'AGN Flux')(LogBool)))
+            axs[Tuple].set_xscale((lambda x: 'linear' if x else 'log')(LogBool))
+            axs[Tuple].set_yscale((lambda x: 'linear' if x else 'log')(LogBool))
+            axs[Tuple].text(0.08, 0.9, '$\Delta$t = {0:.2f}e8'.format((8.99/(size[0]*size[1]))*(i+1)), transform = axs[Tuple].transAxes, fontsize = 12)
+                
+            if i%a == 0:
+                axs[Tuple].set_ylabel((lambda x: 'log(SFR Flux)' if x else 'SFR Flux')(LogBool))
+                axs[Tuple2].set_xlabel(((lambda x: 'log(AGN Flux)' if x else 'AGN Flux')(LogBool)))
+            elif i < a:
+                axs[Tuple3].set_xlabel(((lambda x: 'log(AGN Flux)' if x else 'AGN Flux')(LogBool)))
                                 
-            elif size[0] > size[1]:
+            '''elif size[0] > size[1]:
                 axs[int(i/b), i%b].scatter(x = NewFunctions.delt(self.no_gals, 100, 100 + (899/(size[0]*size[1]))*(i+1), self.data, corr = Corr, Print = False, FluxLog = LogBool)[2], y = NewFunctions.delt(self.no_gals, 100, 100 + (899/(size[0]*size[1]))*(i+1), self.data, corr = Corr, Print = False, FluxLog = LogBool)[3])
-                axs[int(i/b), i%b].set_xscale((lambda x: 'linear' if x else 'log')(LogBool))
+                axs[int(i/b), i%b].set_xscale((lambda x: 'linear' if x else 'log')(LogBool))'''
                 
     
         '''if not LogBool:
