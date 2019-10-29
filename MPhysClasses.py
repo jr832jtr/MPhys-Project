@@ -34,7 +34,7 @@ class AGNSFR:
     
         
         
-    def Coefficients(self, coefftype, LogBool, no_vals, plot = True):
+    def Coefficients(self, coefftype, LogBool, no_vals, plot = True, vline = False):
         
         fig = plt.figure()
         coeffs = []
@@ -60,6 +60,10 @@ class AGNSFR:
             plt.gca().set_ylabel('{} Coefficient'.format(coefftype))
             plt.gca().set_title('{}, {}: {}'.format(self.name, coefftype, Coeff[0]))
             plt.gca().set_xlim(0, 900)
+            plt.gca().set_ylim(0, 1)
+            
+        if vline != False:
+            plt.gca().axvline(x = vline, color = 'r')
         
         return coeffs, Coeff
     
@@ -135,6 +139,9 @@ class AGNSFR:
     
     def GridPlot(self, size, Corr, LogBool):
         
+        if size == (1, 1):
+            raise Exception('ERROR, grid size must be larger than (1, 1)')
+        
         fig, axs = plt.subplots(size[0], size[1], sharex = 'col', sharey = 'row', gridspec_kw={'hspace': 0, 'wspace': 0}, figsize = (12,10))
         
         a = max(size)
@@ -142,20 +149,19 @@ class AGNSFR:
         
         for i in range(size[0]*size[1]):
             
-            if a == 1 or b == 1:
+            if size[1] == 1:
                 Tuple = i
-                Tuple2 = i%a
-                Tuple3 = Tuple
+                Tuple2 = size[0] - 1
+            elif size[0] == 1:
+                Tuple = i
+                Tuple2 = i
             elif size[1] >= size[0]:
                 Tuple = int(i/a), i%a
                 Tuple2 = (b - 1), i%a
-                if i < a:
-                    Tuple3 = (b - 1), i
             elif size[1] < size[0]:
+                a = b
                 Tuple = int(i/b), i%b
-                Tuple2 = (b - 1), i%b
-                if i < b:
-                    Tuple3 = (b - 1), i
+                Tuple2 = size[0] - 1, i
                 
             axs[Tuple].scatter(x = NewFunctions.delt(self.no_gals, 100, 100 + (899/(size[0]*size[1]))*(i+1), self.data, corr = Corr, Print = False, FluxLog = LogBool)[2], y = NewFunctions.delt(self.no_gals, 100, 100 + (899/(size[0]*size[1]))*(i+1), self.data, corr = Corr, Print = False, FluxLog = LogBool)[3])
                 
@@ -163,29 +169,41 @@ class AGNSFR:
             axs[Tuple].set_yscale((lambda x: 'linear' if x else 'log')(LogBool))
             axs[Tuple].text(0.08, 0.9, '$\Delta$t = {0:.2f}e8'.format((8.99/(size[0]*size[1]))*(i+1)), transform = axs[Tuple].transAxes, fontsize = 12)
                 
-            if i%a == 0:
+            if i%a == 0 and size[1] != 1:
                 axs[Tuple].set_ylabel((lambda x: 'log(SFR Flux)' if x else 'SFR Flux')(LogBool))
+            elif size[1] == 1:
+                axs[Tuple].set_ylabel((lambda x: 'log(SFR Flux)' if x else 'SFR Flux')(LogBool))
+            
+            if i < size[1]: #Size[1] is the xaxis size, so iterable should be compared to this when setting xlabel.
                 axs[Tuple2].set_xlabel(((lambda x: 'log(AGN Flux)' if x else 'AGN Flux')(LogBool)))
-            elif i < a:
-                axs[Tuple3].set_xlabel(((lambda x: 'log(AGN Flux)' if x else 'AGN Flux')(LogBool)))
-                                
-            '''elif size[0] > size[1]:
-                axs[int(i/b), i%b].scatter(x = NewFunctions.delt(self.no_gals, 100, 100 + (899/(size[0]*size[1]))*(i+1), self.data, corr = Corr, Print = False, FluxLog = LogBool)[2], y = NewFunctions.delt(self.no_gals, 100, 100 + (899/(size[0]*size[1]))*(i+1), self.data, corr = Corr, Print = False, FluxLog = LogBool)[3])
-                axs[int(i/b), i%b].set_xscale((lambda x: 'linear' if x else 'log')(LogBool))'''
-                
     
-        '''if not LogBool:
-            axs[i%3, int(i/3)].set_xlim(1e39, 1e50)
+    
+    def TimeAverage(self):
         
-        axs[i%3, int(i/3)].set_yscale((lambda x: 'linear' if x else 'log')(LogBool))
-    
-        if i%3 == 0:
-            axs[int(i/3), i%3].set_ylabel((lambda x: 'log(SFR Flux)' if x else 'SFR Flux')(LogBool))
-            axs[(i%3) + 2, int(i/3)].set_xlabel(((lambda x: 'log(AGN Flux)' if x else 'AGN Flux')(LogBool)))
-            axs[(i%3), int(i/3)].set_title(Titles[int(i/3)])
-            axs[int(i/3), i%3].text(0.08, 0.9, '$\Delta$t = {}e8'.format(3.5 + 2*int(i/3)), transform = axs[int(i/3), i%3].transAxes, fontsize = 12)'''
+        ngals = self.no_gals
+        datFra = self.SimPlot(plot = False)
+        datFra[datFra == 0] = np.nan
+        datFra.dropna(axis = 0, thresh = 2, inplace = True)
+        T = datFra.iloc[0, ngals]
+        S = datFra.max(axis = 0)
+        L = []
+        NT = []
+        datFra = datFra.reset_index().drop('index', axis = 1)
 
+        for i in range(len(S) - 1):
+            L.append(datFra[datFra.iloc[:, i] == S[i]].index.tolist())
+
+        L = filter(None, L)
+
+        for i in range(len(L)):
+            NT.append(float(datFra.iloc[L[i], ngals]))
+    
+        NT = NT - T
+        Avg_T = np.mean(NT)/1e6
         
+        self.Coefficients('Spearman', True, 50, plot = True, vline = Avg_T)
+        
+        return Avg_T
     
     
     
