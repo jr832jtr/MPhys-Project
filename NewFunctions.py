@@ -74,9 +74,7 @@ def delt(ngals, n, dn, dataset, corr, deltat = 1e6, tmax = 1e9, Print = True, lo
         return [scs.spearmanr(np.ravel(dataset['lc_agn'][:, n:(dn+1)]), np.ravel(dataset['lc_sfr'][:, n:(dn+1)])), scs.spearmanr(resultF, resultSF), resultF, resultSF]
 
 
-def Average(bins, data, ngals, name, log_y, savefigure = False):
-    
-    fig, axez = plt.subplots(2, 2, figsize = (14, 10), sharex = True)
+def Average(bins, data, ngals, name, log_y, savefigure = False, Return = False):
 
     temp_lis = []
     for i in range(bins):
@@ -84,12 +82,21 @@ def Average(bins, data, ngals, name, log_y, savefigure = False):
     
     data[data == 0] = np.nan
     data['Groups'] = np.ravel(temp_lis)
-
-    data.groupby(data['Groups']).mean().plot(x = 'Time', y = list(np.arange(0,ngals,1)), ax = axez[0, 0], marker = '.', linestyle = '', logy = True, legend = False, style = ['blue', 'green']*(ngals/2), title = 'Average Flux at {} bins for {}'.format(bins, name))
+    
+    if not Return:
+        fig, axez = plt.subplots(2, 2, figsize = (14, 10), sharex = True)
+        
+        data.groupby(data['Groups']).mean().plot(x = 'Time', y = list(np.arange(0,ngals,1)), ax = axez[0, 0], marker = '.', linestyle = '', logy = True, legend = False, style = ['blue', 'green']*(ngals/2), title = 'Average Flux at {} bins for {}'.format(bins, name))
 
     temp_df = data.groupby(data['Groups']).mean()
     temp_df[temp_df > 0] = 1
     temp_df = temp_df.sum(axis = 1) - 1
+    
+    if Return:
+        Max = temp_df.max()
+        Ind = temp_df[temp_df == Max].index.tolist()
+        T = round(data.groupby(data['Groups']).mean()['Time'][Ind[0]], -6)
+        return T
 
     axez[1, 0].scatter(x = data.groupby(data['Groups']).mean()['Time'], y = temp_df, s = 24, marker = 'x', c = 'r');
     axez[0, 1].plot(data.groupby(data['Groups']).mean()['Time'], data.groupby(data['Groups']).mean().drop('Time', axis = 1).mean(axis = 1));
