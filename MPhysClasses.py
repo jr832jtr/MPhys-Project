@@ -180,8 +180,21 @@ class AGNSFR:
     
     def TimeAverage(self):
         
-        ngals = self.no_gals
-        datFra = self.SimPlot(plot = False)
+        Stop = int((NewFunctions.Average(20, self.SimPlot(plot = False), self.no_gals, log_y = False, name = '', Return = True))/1e6)
+        datFra = self.SimPlot(plot = False).iloc[100:Stop, :].reset_index().drop('index', axis = 1)
+        L = []
+
+        for i in range(len(datFra.columns) - 1):
+            n = datFra[datFra[i] == datFra[i].max()].index.tolist()[0]#Gets index of first non-zero element. I.e. AGN triggereing point. 
+            T = datFra.iloc[n, self.no_gals] - 1e8 #Gets delta T
+            L.append(T)
+
+        Avg_T = np.mean(L)/1e6
+        
+        '''ngals = self.no_gals
+        Stop = int((NewFunctions.Average(20, self.SimPlot(plot = False), ngals, log_y = False, name = '', Return = True))/1e6)
+        datFra = self.SimPlot(plot = False).iloc[100:, :]#.iloc[100:Stop, :]
+        T_0 = 100
         datFra[datFra == 0] = np.nan
         datFra.dropna(axis = 0, thresh = 2, inplace = True)
         T = datFra.iloc[0, ngals]
@@ -191,7 +204,7 @@ class AGNSFR:
         datFra = datFra.reset_index().drop('index', axis = 1)
 
         for i in range(len(S) - 1):
-            L.append(datFra[datFra.iloc[:, i] == S[i]].index.tolist())
+            L.append(datFra[datFra.iloc[:, i] == S[i]].index.tolist()[0])
 
         L = filter(None, L)
 
@@ -199,7 +212,7 @@ class AGNSFR:
             NT.append(float(datFra.iloc[L[i], ngals]))
     
         NT = NT - T
-        Avg_T = np.mean(NT)/1e6
+        Avg_T = np.mean(NT)/1e6'''
         
         self.Coefficients('Spearman', True, 50, plot = True, vline = Avg_T)
         
