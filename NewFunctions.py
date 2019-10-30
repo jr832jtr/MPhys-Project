@@ -93,9 +93,10 @@ def Average(bins, data, ngals, name, log_y, savefigure = False, Return = False):
     temp_df = temp_df.sum(axis = 1) - 1
     
     if Return:
-        Max = temp_df.max()
-        Ind = temp_df[temp_df == Max].index.tolist()
-        T = round(data.groupby(data['Groups']).mean()['Time'][Ind[0]], -6)
+        AVals = data.groupby(data['Groups']).mean().drop('Time', axis = 1).mean(axis = 1)
+        Max = AVals[:9].max()#Max = temp_df.max()
+        Ind = AVals[AVals == Max].index.tolist()#Ind = temp_df[temp_df == Max].index.tolist()
+        T = round(data.groupby(data['Groups']).mean()['Time'][Ind[0]], -6)#T = round(data.groupby(data['Groups']).mean()['Time'][Ind[0]], -6)
         return T
 
     axez[1, 0].scatter(x = data.groupby(data['Groups']).mean()['Time'], y = temp_df, s = 24, marker = 'x', c = 'r');
