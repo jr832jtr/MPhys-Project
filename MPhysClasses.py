@@ -34,10 +34,11 @@ class AGNSFR:
     
         
         
-    def Coefficients(self, coefftype, LogBool, no_vals, plot = True, vline = False):
+    def Coefficients(self, coefftype, LogBool, no_vals, tscale, plot = True, vline = False):
         
         fig = plt.figure()
         coeffs = []
+        tscale = tscale - 100
         
         if self.agntype == 'delay':
             start = int((no_vals*2)/9) + 1
@@ -45,7 +46,7 @@ class AGNSFR:
             start = 1
         
         for i in range(start, no_vals, 1):
-            coeffs.append((int(900/no_vals)*i, NewFunctions.delt(self.no_gals, 100, 100 + (int(900/no_vals)*i), self.data, corr = coefftype, Print = False, FluxLog = LogBool)[1][0]))
+            coeffs.append((int(tscale/no_vals)*i, NewFunctions.delt(self.no_gals, 100, 100 + (int(tscale/no_vals)*i), self.data, corr = coefftype, Print = False, FluxLog = LogBool)[1][0]))
 
         coeff_arr = np.reshape(np.array(np.ravel(coeffs)), (len(range(start, no_vals, 1)), 2))
         
@@ -59,7 +60,7 @@ class AGNSFR:
             plt.gca().set_xlabel('Delta T')
             plt.gca().set_ylabel('{} Coefficient'.format(coefftype))
             plt.gca().set_title('{}, {}: {}'.format(self.name, coefftype, Coeff[0]))
-            plt.gca().set_xlim(0, 900)
+            plt.gca().set_xlim(0, tscale)
             plt.gca().set_ylim(0, 1)
             
         if vline != False:
@@ -83,7 +84,7 @@ class AGNSFR:
         return df
     
     
-    
+     
     def Count(self, bins, plot = True):
         
         data = self.SimPlot(plot = False)
@@ -110,9 +111,9 @@ class AGNSFR:
     
     
     
-    def AllPlots(self, coefftype, LogBool, no_vals, bins):
+    def AllPlots(self, coefftype, LogBool, no_vals, tscale, bins):
         
-        coeffs, Coeff = self.Coefficients(coefftype, LogBool, no_vals, plot = False)
+        coeffs, Coeff = self.Coefficients(coefftype, LogBool, no_vals, tscale, plot = False)
         df = self.SimPlot(plot = False)
         count, data = self.Count(bins, plot = False)
         
@@ -128,7 +129,7 @@ class AGNSFR:
         axs[1].set_ylabel('{} Coefficient'.format(coefftype))
         axs[1].set_title('{}, {}: {}'.format(self.name, coefftype, Coeff[0]))
         axs[1].set_ylim(0, 1)
-        axs[1].set_xlim(0, 900)
+        axs[1].set_xlim(0, tscale-100)
         
         axs[2].scatter(x = data.groupby(data['Groups']).mean()['Time'], y = count, s = 24, marker = 'x', c = 'r');
         axs[2].set_xlabel('Time')
@@ -178,9 +179,14 @@ class AGNSFR:
                 axs[Tuple2].set_xlabel(((lambda x: 'log(AGN Flux)' if x else 'AGN Flux')(LogBool)))
     
     
-    def TimeAverage(self):
+    def TimeAverage(self, Tmax = False, tscale = 1000):
         
         Stop = int((NewFunctions.Average(20, self.SimPlot(plot = False), self.no_gals, log_y = False, name = '', Return = True))/1e6)
+        
+        if Tmax:
+            Stop = 1000 #Neccessary for AGN in the large DT, Fmax case as they are clustered around peak SFR.
+                        #This means the need for the Stop function above is moot because there are not as many outliers.
+        print(Stop)
         datFra = self.SimPlot(plot = False).iloc[100:Stop, :].reset_index().drop('index', axis = 1)
         L = []
 
@@ -214,14 +220,41 @@ class AGNSFR:
         NT = NT - T
         Avg_T = np.mean(NT)/1e6'''
         
-        self.Coefficients('Spearman', True, 50, plot = True, vline = Avg_T)
+        self.Coefficients('Spearman', True, 50, plot = True, tscale = tscale, vline = Avg_T)
         
         return Avg_T
     
     
-    
-    
-    
-    
-    
-    
+    def Histogram(self, bins):
+        
+        fig = plt.figure()
+        
+        _df = self.SimPlot(plot = False)
+        _df = _df.iloc[100:, :]
+        _df[_df == 0] = np.nan
+                                         
+        TrigTimes = []
+                                         
+        for i in range(len(_df.columns) - 1):
+            
+            try:
+                _df.iloc[:, i].dropna().iloc[0] #Incase no agn was triggered, returning a list of no entries [].
+            except IndexError: #To see type this into a cell: lis = [] then call lis[0] and you get the same error. 
+                continue
+                
+            Ser = _df.iloc[:, i].dropna().iloc[0]
+            Ind = _df.iloc[:, i][_df.iloc[:, i] == Ser].index.tolist()[0] - 100
+            Time = _df.iloc[Ind, len(_df.columns) - 1]
+            TrigTimes.append(Time - 1e8)
+            
+        plt.hist(TrigTimes, bins)
+                                         
+        return None
+                                         
+                                         
+                                         
+                                         
+                                         
+                                         
+                                         
+                                         
