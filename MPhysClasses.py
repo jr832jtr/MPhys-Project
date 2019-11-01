@@ -197,58 +197,58 @@ class AGNSFR:
 
         Avg_T = np.mean(L)/1e6
         
-        '''ngals = self.no_gals
-        Stop = int((NewFunctions.Average(20, self.SimPlot(plot = False), ngals, log_y = False, name = '', Return = True))/1e6)
-        datFra = self.SimPlot(plot = False).iloc[100:, :]#.iloc[100:Stop, :]
-        T_0 = 100
-        datFra[datFra == 0] = np.nan
-        datFra.dropna(axis = 0, thresh = 2, inplace = True)
-        T = datFra.iloc[0, ngals]
-        S = datFra.max(axis = 0)
-        L = []
-        NT = []
-        datFra = datFra.reset_index().drop('index', axis = 1)
-
-        for i in range(len(S) - 1):
-            L.append(datFra[datFra.iloc[:, i] == S[i]].index.tolist()[0])
-
-        L = filter(None, L)
-
-        for i in range(len(L)):
-            NT.append(float(datFra.iloc[L[i], ngals]))
-    
-        NT = NT - T
-        Avg_T = np.mean(NT)/1e6'''
-        
         self.Coefficients('Spearman', True, 50, plot = True, tscale = tscale, vline = Avg_T)
         
         return Avg_T
     
     
-    def Histogram(self, bins):
+    def Histogram(self, bins, AllBursts = False):
         
-        fig = plt.figure()
         
-        _df = self.SimPlot(plot = False)
-        _df = _df.iloc[100:, :]
-        _df[_df == 0] = np.nan
+        if not AllBursts:
+            fig = plt.figure()
+        
+            _df = self.SimPlot(plot = False)
+        
+            if self.agntype != 'delay':
+                _df = _df.iloc[100:, :]
+
+            _df[_df == 0] = np.nan
                                          
-        TrigTimes = []
+            TrigTimes = []
                                          
-        for i in range(len(_df.columns) - 1):
+            for i in range(len(_df.columns) - 1):
             
-            try:
-                _df.iloc[:, i].dropna().iloc[0] #Incase no agn was triggered, returning a list of no entries [].
-            except IndexError: #To see type this into a cell: lis = [] then call lis[0] and you get the same error. 
-                continue
+                try:
+                    _df.iloc[:, i].dropna().iloc[0] #Incase no agn was triggered, returning a list of no entries [].
+                except IndexError: #To see type this into a cell: lis = [] then call lis[0] and you get the same error. 
+                    continue
                 
-            Ser = _df.iloc[:, i].dropna().iloc[0]
-            Ind = _df.iloc[:, i][_df.iloc[:, i] == Ser].index.tolist()[0] - 100
-            Time = _df.iloc[Ind, len(_df.columns) - 1]
-            TrigTimes.append(Time - 1e8)
+                Ser = _df.iloc[:, i].dropna().iloc[0]
+                Ind = _df.iloc[:, i][_df.iloc[:, i] == Ser].index.tolist()[0] - 100
+                Time = _df.iloc[Ind, len(_df.columns) - 1]
+                TrigTimes.append(Time - 1e8)
             
-        plt.hist(TrigTimes, bins)
-                                         
+            plt.hist(TrigTimes, bins)
+            plt.gca().set_xlabel('Trigger Time')
+            plt.gca().set_ylabel('Count')
+            plt.gca().set_title('Distribution of times to first phase of AGN activity for {}'.format(self.name))
+        
+        
+        if AllBursts:
+            fig = plt.figure()
+            AllTimes = self.data['Trigger Times']
+            BurstTimes = []
+        
+            for burst in AllTimes:
+                for trigger in burst:
+                    BurstTimes.append(trigger)
+            
+            plt.hist(BurstTimes, bins)
+            plt.gca().set_xlabel('Trigger Time')
+            plt.gca().set_ylabel('Count')
+            plt.gca().set_title('Distribution of times for all phases of AGN activity for {}'.format(self.name))
+            
         return None
                                          
                                          
