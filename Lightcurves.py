@@ -248,6 +248,7 @@ def probabilistic_lognorm(t, f, burstheight, burstwidth, cuttail_low=None, f_max
     if randomheight is True and randdist not in ['norm', 'lognorm', 'aird']:
         raise MyExceptions.InputError("random distribution for heights must be norm, lognorm, or aird")
     f_out = numpy.zeros_like(f)
+    agn_list = [] #ME
     agn_on = False
     agn_start = 0
     _n = len(t)
@@ -256,6 +257,7 @@ def probabilistic_lognorm(t, f, burstheight, burstwidth, cuttail_low=None, f_max
             agn_on = randomburst_linear(_f, f_max=f_max)
             if agn_on:
                 agn_start = _t
+                agn_list.append(_t) #ME
                 if randomheight:
                     if randdist == 'lognorm':
                         curscale = numpy.random.lognormal(size=1, **randpars)
@@ -273,7 +275,7 @@ def probabilistic_lognorm(t, f, burstheight, burstwidth, cuttail_low=None, f_max
                                                        norm= burstheight*curscale, loc = _t)[1]
         if agn_on is True and _t >= agn_start + downtime * burstwidth:
             agn_on = False
-    return t, f_out
+    return t, f_out, agn_list#ME
 
 
 
@@ -487,6 +489,7 @@ def simu_lx_sfr(n_gal, bursterror = 5.5e8, tmax=1e9, deltat=1e6, galpoppars=None
     # simulate
     print("Creating AGN lightcurves....")
     lightcurves_agn = []
+    agn_times = []
     if agnlctype == 'delay':
         for _ledd, _lcsfr, _sfr in zip(ledd, lightcurves_sfr, sfrs):
             lightcurves_agn.append(delay(t, _lcsfr / _sfr, scale=_ledd, **agnlcpars)[1])
@@ -506,8 +509,9 @@ def simu_lx_sfr(n_gal, bursterror = 5.5e8, tmax=1e9, deltat=1e6, galpoppars=None
                                                                **agnlcpars)[1])
     elif agnlctype == 'prob_lognorm':
         for _ledd, _lcsfr, _sfr in zip(ledd, lightcurves_sfr, sfrs):
-            lightcurves_agn.append(probabilistic_lognorm(t, _lcsfr / _sfr, burstheight=_ledd,
-                                                               **agnlcpars)[1])
+            probs = probabilistic_lognorm(t, _lcsfr / _sfr, burstheight=_ledd, **agnlcpars) #ME
+            agn_times.append(probs[2]) #ME
+            lightcurves_agn.append(probs[1]) #PARTLY ME
     else:
         raise MyExceptions.Hell("One of those things that should not happen.")
     print("Adding SF baseline...")
@@ -520,4 +524,4 @@ def simu_lx_sfr(n_gal, bursterror = 5.5e8, tmax=1e9, deltat=1e6, galpoppars=None
             truncated[i] = truncate_agnlc(_lagn, _ledd * truncateedd)
     return {'m_gal': m_gal, 'sfr': sfrs, 'bhmass': bhmass, 'ledd': ledd, 'lc_sfr': numpy.array(lightcurves_sfr),
             'lc_agn_nottruncated': numpy.array(lightcurves_agn), 't': t, 'lc_agn': numpy.array(truncated),
-            'peak_sfr': peak_sfr, 'mean_sfrs': mean_sfrs, 'n_obj': n_gal, 'n_lc': len(lightcurves_sfr[0])}
+            'peak_sfr': peak_sfr, 'mean_sfrs': mean_sfrs, 'n_obj': n_gal, 'n_lc': len(lightcurves_sfr[0]), 'Trigger Times':agn_times}#ME
