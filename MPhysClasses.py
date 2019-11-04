@@ -7,14 +7,16 @@ import NewFunctions
 
 class AGNSFR:
     
-    def __init__(self, agntype, agnlcpars, lcpars, no_gals, sbscale, name):
+    def __init__(self, agntype, agnlcpars, lcpars, tmax, deltat, no_gals, sbscale, name):
         self.agntype = agntype
         self.agnlcpars = agnlcpars
         self.no_gals = no_gals
         self.sbscale = sbscale
         self.lcpars = lcpars
         self.name = name
-        self.data = Lifetimes.simu_lx_sfr(no_gals, sbscale = sbscale, lcpars = lcpars, agnlcpars = agnlcpars, cannedgalaxies = False, agnlctype = agntype)
+        self.tmax = tmax
+        self.deltat = deltat
+        self.data = Lifetimes.simu_lx_sfr(no_gals, tmax = tmax, deltat = deltat, sbscale = sbscale, lcpars = lcpars, agnlcpars = agnlcpars, cannedgalaxies = False, agnlctype = agntype)
         
         
         
@@ -46,7 +48,7 @@ class AGNSFR:
             start = 1
         
         for i in range(start, no_vals, 1):
-            coeffs.append((int(tscale/no_vals)*i, NewFunctions.delt(self.no_gals, 100, 100 + (int(tscale/no_vals)*i), self.data, corr = coefftype, Print = False, FluxLog = LogBool)[1][0]))
+            coeffs.append((int(tscale/no_vals)*i, NewFunctions.delt(self.no_gals, 100, 100 + (int(tscale/no_vals)*i), self.data, corr = coefftype, Print = False, FluxLog = LogBool, tmax = self.tmax, deltat = self.deltat)[1][0]))
 
         coeff_arr = np.reshape(np.array(np.ravel(coeffs)), (len(range(start, no_vals, 1)), 2))
         
@@ -91,7 +93,7 @@ class AGNSFR:
         
         temp_lis = []
         for i in range(bins):
-            temp_lis.append([i]*int(1000/bins))
+            temp_lis.append([i]*int((self.tmax/self.deltat)/bins))
     
         data[data == 0] = np.nan
         data['Groups'] = np.ravel(temp_lis)
@@ -164,7 +166,7 @@ class AGNSFR:
                 Tuple = int(i/b), i%b
                 Tuple2 = size[0] - 1, i
                 
-            axs[Tuple].scatter(x = NewFunctions.delt(self.no_gals, 100, 100 + (899/(size[0]*size[1]))*(i+1), self.data, corr = Corr, Print = False, FluxLog = LogBool)[2], y = NewFunctions.delt(self.no_gals, 100, 100 + (899/(size[0]*size[1]))*(i+1), self.data, corr = Corr, Print = False, FluxLog = LogBool)[3])
+            axs[Tuple].scatter(x = NewFunctions.delt(self.no_gals, 100, 100 + (899/(size[0]*size[1]))*(i+1), self.data, corr = Corr, Print = False, FluxLog = LogBool, tmax = self.tmax, deltat = self.deltat)[2], y = NewFunctions.delt(self.no_gals, 100, 100 + (899/(size[0]*size[1]))*(i+1), self.data, corr = Corr, Print = False, FluxLog = LogBool, tmax = self.tmax, deltat = self.deltat)[3])
                 
             axs[Tuple].set_xscale((lambda x: 'linear' if x else 'log')(LogBool))
             axs[Tuple].set_yscale((lambda x: 'linear' if x else 'log')(LogBool))
@@ -181,7 +183,7 @@ class AGNSFR:
     
     def TimeAverage(self, Tmax = False, tscale = 1000):
         
-        Stop = int((NewFunctions.Average(20, self.SimPlot(plot = False), self.no_gals, log_y = False, name = '', Return = True))/1e6)
+        Stop = int((NewFunctions.Average(20, self.SimPlot(plot = False), self.no_gals, log_y = False, name = '', Return = True, tmax = self.tmax, deltat = self.deltat))/self.deltat)
         
         if Tmax:
             Stop = 1000 #Neccessary for AGN in the large DT, Fmax case as they are clustered around peak SFR.
@@ -195,7 +197,7 @@ class AGNSFR:
             T = datFra.iloc[n, self.no_gals] - 1e8 #Gets delta T
             L.append(T)
 
-        Avg_T = np.mean(L)/1e6
+        Avg_T = np.mean(L)/self.deltat
         
         self.Coefficients('Spearman', True, 50, plot = True, tscale = tscale, vline = Avg_T)
         
@@ -242,7 +244,7 @@ class AGNSFR:
         
             for burst in AllTimes:
                 for trigger in burst:
-                    BurstTimes.append(trigger)
+                    BurstTimes.append(trigger - 1e8)
             
             plt.hist(BurstTimes, bins)
             plt.gca().set_xlabel('Trigger Time')
