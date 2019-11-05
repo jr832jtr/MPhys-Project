@@ -48,7 +48,7 @@ class AGNSFR:
             start = 1
         
         for i in range(start, no_vals, 1):
-            coeffs.append((int(tscale/no_vals)*i, NewFunctions.delt(self.no_gals, 100, 100 + (int(tscale/no_vals)*i), self.data, corr = coefftype, Print = False, FluxLog = LogBool, tmax = self.tmax, deltat = self.deltat)[1][0]))
+            coeffs.append((int(tscale/no_vals)*i*self.deltat, NewFunctions.delt(self.no_gals, 100, 100 + (int(tscale/no_vals)*i), self.data, corr = coefftype, Print = False, FluxLog = LogBool, tmax = self.tmax, deltat = self.deltat)[1][0]))
 
         coeff_arr = np.reshape(np.array(np.ravel(coeffs)), (len(range(start, no_vals, 1)), 2))
         
@@ -62,7 +62,7 @@ class AGNSFR:
             plt.gca().set_xlabel('Delta T')
             plt.gca().set_ylabel('{} Coefficient'.format(coefftype))
             plt.gca().set_title('{}, {}: {}'.format(self.name, coefftype, Coeff[0]))
-            plt.gca().set_xlim(0, tscale)
+            plt.gca().set_xlim(0, tscale*self.deltat)
             plt.gca().set_ylim(0, 1)
             
         if vline != False:
@@ -131,7 +131,7 @@ class AGNSFR:
         axs[1].set_ylabel('{} Coefficient'.format(coefftype))
         axs[1].set_title('{}, {}: {}'.format(self.name, coefftype, Coeff[0]))
         axs[1].set_ylim(0, 1)
-        axs[1].set_xlim(0, tscale-100)
+        axs[1].set_xlim(0, (tscale-100)*self.deltat)
         
         axs[2].scatter(x = data.groupby(data['Groups']).mean()['Time'], y = count, s = 24, marker = 'x', c = 'r');
         axs[2].set_xlabel('Time')
@@ -183,10 +183,10 @@ class AGNSFR:
     
     def TimeAverage(self, Tmax = False, tscale = 1000):
         
-        Stop = int((NewFunctions.Average(20, self.SimPlot(plot = False), self.no_gals, log_y = False, name = '', Return = True, tmax = self.tmax, deltat = self.deltat))/self.deltat)
+        Stop = int((NewFunctions.Average(20, self.SimPlot(plot = False), self.no_gals, log_y = False, name = '', Return = True))/self.deltat)
         
         if Tmax:
-            Stop = 1000 #Neccessary for AGN in the large DT, Fmax case as they are clustered around peak SFR.
+            Stop = tscale #Neccessary for AGN in the large DT, Fmax case as they are clustered around peak SFR.
                         #This means the need for the Stop function above is moot because there are not as many outliers.
         print(Stop)
         datFra = self.SimPlot(plot = False).iloc[100:Stop, :].reset_index().drop('index', axis = 1)
@@ -197,7 +197,7 @@ class AGNSFR:
             T = datFra.iloc[n, self.no_gals] - 1e8 #Gets delta T
             L.append(T)
 
-        Avg_T = np.mean(L)/self.deltat
+        Avg_T = np.mean(L)
         
         self.Coefficients('Spearman', True, 50, plot = True, tscale = tscale, vline = Avg_T)
         
