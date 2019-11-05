@@ -128,3 +128,53 @@ def Average(bins, data, ngals, name, log_y, savefigure = False, Return = False):
     plt.show()
                         
     return None      
+
+
+
+def takeSecond(elem):
+    return elem[1]
+
+    
+
+def FindCorr(Coeffs, k, tscale, line = True):
+
+    size = (tscale - 100)/len(Coeffs)
+    
+    spearlist = []
+    difflist = []
+    meanlist = []
+    maxlist = []
+    minlist = []
+    rankmax = []
+    rankmin = []
+    ranks = []
+
+    for i in range(len(Coeffs)):
+        spearlist.append(Coeffs[i])
+
+    #for i in range(len(spearlist) - 1):
+    #    difflist.append(abs(spearlist[i + 1] - spearlist[i]))
+    
+    for i in range(len(spearlist) - (k + 1)):
+        #meanlist.append([np.mean(difflist[:i + k]), np.mean(difflist[i + k:]), i + k + 1])
+        meanlist.append([scs.linregress(Coeffs[i:i + k])[0], scs.linregress(Coeffs[i + k:i + 2*k])[0], i + k + 1])
+        
+    _df = pd.DataFrame(meanlist, columns = ['Mean Below Point', 'Mean Above Point', 'Point'])
+    _df.dropna(thresh = 3, inplace = True)
+    max_val = _df.max(axis = 0)[0]
+    min_val = _df.min(axis = 0)[1]
+    indmax = _df.iloc[:, 0][_df.iloc[:, 0] == max_val].index.tolist()[0]
+    indmin = _df.iloc[:, 1][_df.iloc[:, 1] == min_val].index.tolist()[0]
+    _df = _df.sort_values(by = 'Mean Below Point', ascending = False).reset_index().drop('index', axis = 1)
+    _df['Rank Max'] = _df.index + 1
+    _df = _df.sort_values(by = 'Mean Above Point').reset_index().drop('index', axis = 1)
+    _df['Rank Min'] = _df.index + 1
+    _df['Rank Total'] = abs(_df['Rank Max'] + _df['Rank Min'])
+    _df = _df.sort_values(by = 'Rank Total')
+    
+    vline = _df.iloc[0, 2]*size*1e7
+    
+    if line:
+        return vline
+    else:
+        return _df
