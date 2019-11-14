@@ -86,7 +86,7 @@ def Average(bins, data, ngals, name, log_y, savefigure = False, Return = False):
     if not Return:
         fig, axez = plt.subplots(2, 2, figsize = (14, 10), sharex = True)
         
-        data.groupby(data['Groups']).mean().plot(x = 'Time', y = list(np.arange(0,ngals,1)), ax = axez[0, 0], marker = '.', linestyle = '', logy = True, legend = False, style = ['blue', 'green']*(ngals/2), title = 'Average Flux at {} bins for {}'.format(bins, name))
+        data.groupby(data['Groups']).mean().plot(x = 'Time', y = list(np.arange(0,ngals,1)), ax = axez[0, 0], marker = '.', linestyle = '', logy = True, legend = False, style = ['blue', 'green']*int(ngals/2), title = 'Average Flux at {} bins for {}'.format(bins, name))
 
     temp_df = data.groupby(data['Groups']).mean()
     temp_df[temp_df > 0] = 1
