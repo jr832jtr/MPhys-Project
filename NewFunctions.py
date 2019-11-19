@@ -1,7 +1,9 @@
+import Lightcurves as Lifetimes
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import scipy.stats as scs
+from scipy import optimize
 
 def plot_marker(point, index, c, SubPlots, Graph = True):
     
@@ -178,3 +180,18 @@ def FindCorr(Coeffs, k, tscale, line = True):
         return vline
     else:
         return _df
+    
+    
+    
+def Z_Calc(Time):
+    forcalc_x = []
+    forcalc_y = []
+
+    for i in range(100):
+        forcalc_y.append(0.01*(i + 1))
+        forcalc_x.append(Lifetimes.MyCosmology.cosmocal(0.01*(i + 1))['ageAtZ'])
+    
+    curve = optimize.curve_fit(lambda t,a,b,c: a*t**-b + c,  forcalc_x,  forcalc_y, p0 = (2, 1,0.5))
+    
+    return curve[0][0]*Time**-curve[0][1] + curve[0][2]
+    
