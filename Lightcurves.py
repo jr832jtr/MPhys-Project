@@ -10,8 +10,12 @@ import HostGalaxies
 import MyCosmology
 import MyAstroCalc
 
-def lognorm_lightcurve(t_max, deltat, stretch=1, s=1, scale=1, loc=None, peakatone=False, norm=1):
-    t = numpy.arange(0, int(t_max), deltat)
+def lognorm_lightcurve(t_max, deltat, stretch=1, s=1, scale=1, loc=None, peakatone=False, norm=1, ttype = 1, Time = None):
+    if ttype == 1:
+        t = numpy.arange(0, int(t_max), deltat)
+    elif ttype == 2:
+        t = numpy.arange(0, max(Time) + abs(Time[1] - Time[0]), abs(Time[1] - Time[0]))
+        
     if loc is None:
         loc = 0.5*t_max
     f = scipy.stats.lognorm.pdf(t / stretch, s=s, loc=loc/stretch, scale=scale)
@@ -223,7 +227,7 @@ def probabilistic_deltaburst(t, f, burstlength, burstheight, f_max=None,
     return t, f_out
 
 def probabilistic_lognorm(t, f, burstheight, burstwidth, cuttail_low=None, f_max=None,
-                                downtime=2, randomheight=True, randdist='lognorm', randpars=None, scalecutoff=0.01):
+                                downtime=2, randomheight=True, randdist='lognorm', randpars=None, scalecutoff=0.01, ttype = 1, Time = None):
     """
     A collection of bursts that appear randomly but with a probability that scales with the input flux
     @param t:
@@ -271,8 +275,10 @@ def probabilistic_lognorm(t, f, burstheight, burstwidth, cuttail_low=None, f_max
                         curscale = 0
                 else:
                     curscale = 1.
+                
                 f_out += lognorm_lightcurve(max(t)+abs(t[1]-t[0]), abs(t[1]-t[0]), stretch=burstwidth,
-                                                       norm= burstheight*curscale, loc = _t)[1]
+                                                       norm= burstheight*curscale, loc = _t, ttype = ttype, Time = Time)[1]
+                    
         if agn_on is True and _t >= agn_start + downtime * burstwidth:
             agn_on = False
     return t, f_out, agn_list#ME
@@ -509,7 +515,7 @@ def simu_lx_sfr(n_gal, bursterror = 5.5e8, tmax=1e9, deltat=1e6, galpoppars=None
                                                                **agnlcpars)[1])
     elif agnlctype == 'prob_lognorm':
         for _ledd, _lcsfr, _sfr in zip(ledd, lightcurves_sfr, sfrs):
-            probs = probabilistic_lognorm(t, _lcsfr / _sfr, burstheight=_ledd, **agnlcpars) #ME
+            probs = probabilistic_lognorm(t, _lcsfr / _sfr, burstheight=_ledd, randomheight = False, **agnlcpars) #ME
             agn_times.append(probs[2]) #ME
             lightcurves_agn.append(probs[1]) #PARTLY ME
     else:
