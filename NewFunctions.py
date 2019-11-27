@@ -194,4 +194,69 @@ def Z_Calc(Time):
     curve = optimize.curve_fit(lambda t,a,b,c: a*t**-b + c,  forcalc_x,  forcalc_y, p0 = (2, 1,0.5))
     
     return curve[0][0]*Time**-curve[0][1] + curve[0][2]
+
+
+
+def AGN(AGN_Type, AoU, LognormSFHs, BurstHeights, BurstWidth = 2e8, Fmax = 10, DownTime = 5, t_delay = 2e8):
     
+    AGNs = ['Probabilistic', 'Delay', 'Random']
+    if AGN_Type not in AGNs:
+        raise Exception("ERROR: AGN_Type should either be \'Probabilistic\', \'Delay\' or \'Random\'!")
+    
+    Time = AoU #raw time data from bagpipes
+    bheights = BurstHeights
+    T2 = Time[Time > 0][::-1] #ensuring time is non-negative, and increasing
+    bagpipes_df = pd.DataFrame({'Time':T2})
+    Column_Names = {0:'Universe Time'}
+    TriggerTimes = []
+    
+    if AGN_Type == 'Probabilistic':
+        for i in range(len(LognormSFHs)): #iterate through all starbursts
+            _df = pd.DataFrame() #to handle data
+            _df['Time'], _df['Flux'] = T2, LognormSFHs[i][Time > 0.0][::-1]
+            CutOff = _df[_df['Flux'] > 3e-4].iloc[0, :].name #cutoff stops unphysical agn activity occuring
+            
+            _df = _df.iloc[CutOff:, :]
+            step = (_df['Time'].iloc[-1] - _df['Time'].iloc[0])/len(_df['Time'])
+            T = np.arange(_df['Time'].iloc[0], max(_df['Time']), step) 
+            #reproduce time data in non-log format so agn are not distorted
+        
+            if len(T) > len(_df['Flux']):
+                T = T[:-1]
+
+            _t, _agn, _triggertimes = Lifetimes.probabilistic_lognorm(np.array(_df['Time']), np.array(_df['Flux']), bheights[i], BurstWidth, f_max = max(_df['Flux'])*Fmax, downtime = DownTime, randomheight = False, ttype = 2, Time = T)
+        
+            TriggerTimes.append(_triggertimes)
+            _df2 = pd.DataFrame({'AGN Time': T, 'AGN Flux': _agn}).set_index(_df['Flux'].index)
+            bagpipes_df = pd.concat([bagpipes_df, _df['Flux'], _df2], ignore_index = True, axis = 1)
+    
+            Column_Names[1 + i*3] = 'SFH {}'.format(i) #SFH history same as universal time ('LOG SCALE')
+            Column_Names[2 + i*3] = 'AGN Time {}'.format(i) #AGN time NOT LOGSCALE, understand the point T (row 12)
+            Column_Names[3 + i*3] = 'AGN Flux {}'.format(i) #Hence AGN time needed, but not SFH time
+
+        bagpipes_df.rename(columns = Column_Names, inplace = True)
+        
+        return bagpipes_df, TriggerTimes
+        
+    if AGN_Type == 'Delay':
+        for i in range(len(LognormSFHs)):
+            _t, _f = Lifetimes.delay(T2, LognormSFHs[i][Time > 0.0][::-1], t_delay = t_delay)
+            _df = pd.DataFrame(data = {'SFH':LognormSFHs[i][Time > 0.0][::-1], 'AGN Time':_t + t_delay, 'AGN Rate':_f})
+            bagpipes_df = pd.concat([bagpipes_df, _df], ignore_index = True, axis = 1)
+            Column_Names[1 + i*3] = 'SFH {}'.format(i)
+            Column_Names[2 + i*3] = 'Delayed AGN Time {}'.format(i)
+            Column_Names[3 + i*3] = 'Delayed AGN AR {}'.format(i)
+            
+        bagpipes_df.rename(columns = Column_Names, inplace = True)
+        
+        return bagpipes_df
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
