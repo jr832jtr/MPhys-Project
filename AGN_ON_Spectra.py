@@ -7,7 +7,8 @@ import bagpipes
 import matplotlib.pyplot as plt
 
 #parameters and list initialisation
-agnlcparsP = {'t_delay':2e8}#{'downtime':500, 'burstwidth':5e8, 'f_max':2000}
+#agnlcparsP = {'t_delay':2e8} # -DELAYED
+agnlcparsP = {'downtime':500, 'burstwidth':5e8, 'f_max':2000} # -PROBABILISTIC
 lcpars = {'stretch':2e8, 'loc':1e9}
 no_gals = 200
 sbscale = 100
@@ -16,63 +17,26 @@ goodss_filt_list = np.loadtxt("filters/goodss_filt_list.txt", dtype="str")
 thresh = 0.5
 ind = 0
 Column_Names = {0:'Universe Time'}
-lognormsfh, bheights = [], []
+dblplaw_params = {'alpha':0.5, 'beta':10, 'metallicity':0.2}
+lognorm_params = {'Tmax':11.4, 'Tmin':10, 'fwhm':0.2, 'metallicity':0.75}
+Gal_Params = {'dblplaw':dblplaw_params, 'lognorm':lognorm_params, 'redshift':0.2}
 TimesMasses, TriggerTimes, AGN_ON_Spectras = [], [], []
 
 #generate galaxies
-Prob_Sim = MPhysClasses.AGNSFR('delay', tmax = 1e10, deltat = 1e7, agnlcpars = agnlcparsP, 
-                               lcpars = lcpars, no_gals = no_gals, sbscale = sbscale, name = 'delay')
-masses = Prob_Sim.data['m_gal']
-ledds = Prob_Sim.data['ledd']
+Prob_Sim = MPhysClasses.AGNSFR('prob_lognorm', tmax = 1e10, deltat = 1e7, agnlcpars = agnlcparsP, lcpars = lcpars, no_gals = no_gals, sbscale = sbscale, name = 'Prob Sim')
 
 #Produce SFH and spectra for galaxies
-for i in range(len(masses)):
-    
-    model_components = {}
-    model_components["redshift"] = 0.2
-
-    dust = {}
-    dust["type"] = "Calzetti"
-    dust["Av"] = 0.2 
-
-    dblplaw = {}
-    dblplaw['alpha'] = 0.5
-    dblplaw['beta'] = 10
-    dblplaw['metallicity'] = 0.2
-    model_components['dust'] = dust
-    
-    lognormal = {}
-    lognormal['fwhm'] = 0.2
-    lognormal['metallicity'] = 0.75
-    
-    time_dblp = np.random.uniform(3, 6, 1)[0] #creates randomness in when galaxies formed
-    dblplaw['tau'] = time_dblp
-    
-    time_lgnl = np.random.uniform(11.4, 10, 1)[0]
-    lognormal['tmax'] = time_lgnl
-    mass_fraction = np.random.uniform(5, 20, 1)[0] #randomness to the amount of mass in a starburst.
-    lognormal['massformed'] = np.log10(masses[i]/mass_fraction)
-    
-    chance = np.random.uniform(0, 1, 1)[0]
-    
-    if chance > thresh: #Separating starburst galaxies from galaxies with out starbursts
-        model_components['lognormal'] = lognormal #Only some galaxies will have starbursts.
-        dblplaw['massformed'] = np.log10(masses[i] - (masses[i]/mass_fraction))
-        model_components['dblplaw'] = dblplaw
-        _galaxy = bagpipes.model_galaxy(model_components, filt_list=goodss_filt_list, spec_wavs=obs_wavs)
-        TimesMasses.append({'BurstTime':time_lgnl, 'PwrLawTime':time_dblp, 
-                            'BurstMass':lognormal['massformed'], 'PwrLawMass':dblplaw['massformed']})
-        lognormsfh.append(_galaxy.sfh.component_sfrs['lognormal'])
-        bheights.append(ledds[i])
+SFHs = NewFunctions.Generate_SFHs([3000., 6000.], Prob_Sim, 0.5, Gal_Params)
 
 #Generating agn activity from starburst
-Time = (_galaxy.sfh.age_of_universe - _galaxy.sfh.ages)
-#bagpipes_df = NewFunctions.AGN('Delay', Time, lognormsfh, bheights) # -DELAYED
-#AGN_ON = np.array(bagpipes_df[bagpipes_df['Delayed AGN AR 0'] > 0.0]['Delayed AGN Time 0']) # -DELAYED
+Time = SFHs['Time']
+_galaxy = SFHs['Galaxy']
+TimesMasses = SFHs['TimesMasses']
+#bagpipes_df = NewFunctions.Generate_AGN('Delay', Time, SFHs['lognormlist'], SFHs['AccRates']) # -DELAYED
+#TriggerTimes = [[agnlcparsP['t_delay']]]*len(SFHs['lognormlist']) # -DELAYED
 
-bagpipes_df, TriggerTimes = NewFunctions.Generate_AGN('Probabilistic', Time, lognormsfh, bheights) # -PROBABILISTIC
-#AGN_Index = bagpipes_df['Universe Time'][np.array(bagpipes_df['Universe Time']) == TriggerTimes[ind]].index[0] # -PROBABILISTIC
-AGN_ON = NewFunctions.AGN_Periods(bagpipes_df, TriggerTimes, ind, 25, 1, _galaxy.sfh.age_of_universe)#np.array(bagpipes_df.iloc[AGN_Index:, :]['Universe Time']) # -PROBABILISTIC
+bagpipes_df, TriggerTimes = NewFunctions.Generate_AGN('Probabilistic', Time, SFHs['lognormlist'], SFHs['AccRates'], BurstWidth = 2e7, DownTime = 4) # -PROBABILISTIC
+AGN_ON = NewFunctions.AGN_Periods('Prob', bagpipes_df, TriggerTimes, ind, 25, 1, _galaxy.sfh.age_of_universe)
 
 #Reproducing galaxies but ready to take spectra over time
 for i in range(len(AGN_ON)):
@@ -110,9 +74,9 @@ Spectra_Average = Spectra_Sum/len(AGN_ON_Spectras)
 
 fig = plt.figure(figsize = (12, 4))
 ax = plt.subplot()
-x, y = zip(*Spectra_Sum)
+x, y = zip(*Spectra_Average)
 y = np.array(y)/10**-14
-x = np.array(x)/len(AGN_ON_Spectras)
+#x = np.array(x)/len(AGN_ON_Spectras)
 plt.plot(x, y)
 ax.set_ylabel("$\\mathrm{f_{\\lambda}}\\ \\mathrm{/\\ 10^{"+ str(-14)+ "}\\ erg\\ s^{-1}\\ cm^{-2}\\ \\AA^{-1}}$")
 ax.set_xlabel("$\\lambda / \\mathrm{\\AA}$")
