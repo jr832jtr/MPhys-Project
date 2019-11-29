@@ -308,107 +308,16 @@ def AGN_Periods(AGN_Type, SFHs_df, TriggerTimes, num, thresh, Scale, AoU, show =
         return AGN_periods
 
 
-
-def Generate_SFHs(WL, AGN_df, SB_Prob, Gal_Params, SFH_Only = True, No_SB = False):
     
-    obs_wavs = np.arange(WL[0], WL[1], 0.1)
-    goodss_filt_list = np.loadtxt("filters/goodss_filt_list.txt", dtype="str")
-    
-    masses = AGN_df.data['m_gal']
-    ledds = AGN_df.data['ledd']
-    thresh = SB_Prob
-    lognormsfh = []
-    bheights = []
-    TimesMasses = []
-    
-    if not SFH_Only:
-        SB_sfh_list = []
-        NSB_sfh_list = []
-        SB_sfhs = []
-        NSB_sfhs = []
-        SB_spectra = []
-        NSB_spectra = []
-        SB_mass = []
-        NSB_mass = []
-
-    for i in range(len(masses)):
-    
-        lgnl_U, lgnl_L = Gal_Params['lognorm']['Tmax'], Gal_Params['lognorm']['Tmin']
-        
-        model_components = {}
-        model_components["redshift"] = Gal_Params["redshift"]
-    
-        dust = {}
-        dust["type"] = "Calzetti"
-        dust["Av"] = 0.2 
-
-        dblplaw = {}
-        dblplaw['alpha'] = Gal_Params['dblplaw']['alpha']
-        dblplaw['beta'] = Gal_Params['dblplaw']['beta']
-        dblplaw['metallicity'] = Gal_Params['dblplaw']['metallicity']
-        model_components['dust'] = dust
-    
-        lognormal = {}
-        lognormal['fwhm'] = Gal_Params['lognorm']['fwhm']
-        lognormal['metallicity'] = Gal_Params['lognorm']['metallicity']
-    
-        time_dblp = np.random.uniform(3, 6, 1)[0] #creates randomness in when galaxies formed
-        dblplaw['tau'] = time_dblp
-        
-        time_lgnl = np.random.uniform(lgnl_U, lgnl_L, 1)[0]
-        lognormal['tmax'] = time_lgnl
-        mass_fraction = np.random.uniform(5, 20, 1)[0] #randomness to the amount of mass in a starburst.
-        lognormal['massformed'] = np.log10(masses[i]/mass_fraction)
-    
-        chance = np.random.uniform(0, 1, 1)[0]
-    
-        if chance > thresh: #Separating starburst galaxies from galaxies with out starbursts
-            model_components['lognormal'] = lognormal #Only some galaxies will have starbursts.
-            dblplaw['massformed'] = np.log10(masses[i] - (masses[i]/mass_fraction))
-            model_components['dblplaw'] = dblplaw
-            _galaxy = bagpipes.model_galaxy(model_components, filt_list=goodss_filt_list, spec_wavs=obs_wavs)
-            
-            if not SFH_Only:
-                print('check 1')
-                SB_sfhs.append(_galaxy.sfh.sfh)
-                SB_sfh_list.append(_galaxy.sfh.sfh[0])
-                SB_spectra.append(_galaxy.spectrum)
-                SB_mass.append(masses[i])
-                
-            lognormsfh.append(_galaxy.sfh.component_sfrs['lognormal'])
-            bheights.append(ledds[i])
-            TimesMasses.append({'BurstTime':time_lgnl, 'PwrLawTime':time_dblp, 
-                                'BurstMass':lognormal['massformed'], 'PwrLawMass':dblplaw['massformed']})
-        elif No_SB: #Galaxies without starbursts
-            print('check 2')
-            dblplaw['massformed'] = np.log10(masses[i])
-            model_components['dblplaw'] = dblplaw
-            _galaxy = bagpipes.model_galaxy(model_components, filt_list=goodss_filt_list, spec_wavs=obs_wavs)
-            NSB_sfhs.append(_galaxy.sfh.sfh)
-            NSB_sfh_list.append(_galaxy.sfh.sfh[0])
-            NSB_spectra.append(_galaxy.spectrum)
-            NSB_mass.append(masses[i])
-    
-    Time = (_galaxy.sfh.age_of_universe - _galaxy.sfh.ages)
-    SFH_Dic = {'Time':Time, 'Galaxy':_galaxy, 'lognormlist':lognormsfh, 'AccRates':bheights, 'TimesMasses':TimesMasses}
-    
-    if not SFH_Only:
-        SB_Data = {'SB_mass':SB_mass, 'SB_sfh_list':SB_sfh_list, 'SB_sfhs':SB_sfhs, 'SB_spectra':SB_spectra, 'Time':Time}
-    
-    if SFH_Only:
-        return SFH_Dic
-    elif not SFH_Only:
-        MainSequenceData()
-
-
-
-def MainSequenceData(SB_Data):
+def MainSequenceData(SB_Data, SFH_Dic, Save = False):
     MASS = SB_Data['SB_mass']
     sfh_list = SB_Data['SB_sfh_list']
     sfhs = SB_Data['SB_sfhs']
     spectra = SB_Data['SB_spectra']
     bins = 4
     binlist = []
+    model_components = SB_Data['Model_Components']
+    lognormsfh = SFH_Dic['lognormlist']
     AoU = Lifetimes.MyCosmology.cosmocal(model_components["redshift"])['ageAtZ']
 
     for i in range(bins):
@@ -476,7 +385,116 @@ def MainSequenceData(SB_Data):
     Sfrs_n_Masses.rename(index = {0:'High SFR log(SFR [M*/yr])', 1:' High SFR log(M [M*])', 2:'High Delta T [Gyr]', 3:'Low SFR log(SFR [M*/yr])', 4:' Low SFR log(M [M*])', 5:'Low Delta T [Gyr]'}, inplace = True)
 
 
-    Data = {}
+    Data = {'Max_SFHs':sfh_df_max, 'Min_SFHs':sfh_df_min, 'SFRsMassesTimes':Sfrs_n_Masses, 'Max_Spectra':Spectra_max, 
+           'Min_Spectra':Spectra_min}
+    
+    if Save:
+        sfh_df_min.to_csv('Min SF History z={}'.format(model_components['redshift']), sep = ',', index = False)
+        sfh_df_max.to_csv('Max SF History z={}'.format(model_components['redshift']), sep = ',', index = False)
+        Sfrs_n_Masses.to_csv('SFRs and Masses z={}'.format(model_components['redshift']), sep = ',')
+        Spectra_max.to_csv('Max Spectral Data z={}'.format(model_components['redshift']), sep = ',', index = False)
+        Spectra_min.to_csv('Min Spectral Data z={}'.format(model_components['redshift']), sep = ',', index = False)
+        return None
+    elif not Save:
+        return Data
+    
+    
+
+def Generate_SFHs(WL, AGN_df, SB_Prob, Gal_Params, SFH_Only = True, No_SB = False, Save_Data = False):
+    
+    obs_wavs = np.arange(WL[0], WL[1], 0.1)
+    goodss_filt_list = np.loadtxt("filters/goodss_filt_list.txt", dtype="str")
+    
+    masses = AGN_df.data['m_gal']
+    ledds = AGN_df.data['ledd']
+    thresh = SB_Prob
+    lognormsfh = []
+    bheights = []
+    TimesMasses = []
+    
+    if not SFH_Only:
+        SB_sfh_list = []
+        NSB_sfh_list = []
+        SB_sfhs = []
+        NSB_sfhs = []
+        SB_spectra = []
+        NSB_spectra = []
+        SB_mass = []
+        NSB_mass = []
+
+    for i in range(len(masses)):
+    
+        lgnl_U, lgnl_L = Gal_Params['lognorm']['Tmax'], Gal_Params['lognorm']['Tmin']
+        
+        model_components = {}
+        model_components["redshift"] = Gal_Params["redshift"]
+    
+        dust = {}
+        dust["type"] = "Calzetti"
+        dust["Av"] = 0.2 
+
+        dblplaw = {}
+        dblplaw['alpha'] = Gal_Params['dblplaw']['alpha']
+        dblplaw['beta'] = Gal_Params['dblplaw']['beta']
+        dblplaw['metallicity'] = Gal_Params['dblplaw']['metallicity']
+        model_components['dust'] = dust
+    
+        lognormal = {}
+        lognormal['fwhm'] = Gal_Params['lognorm']['fwhm']
+        lognormal['metallicity'] = Gal_Params['lognorm']['metallicity']
+    
+        time_dblp = np.random.uniform(3, 6, 1)[0] #creates randomness in when galaxies formed
+        dblplaw['tau'] = time_dblp
+        
+        time_lgnl = np.random.uniform(lgnl_U, lgnl_L, 1)[0]
+        lognormal['tmax'] = time_lgnl
+        mass_fraction = np.random.uniform(5, 20, 1)[0] #randomness to the amount of mass in a starburst.
+        lognormal['massformed'] = np.log10(masses[i]/mass_fraction)
+    
+        chance = np.random.uniform(0, 1, 1)[0]
+    
+        if chance > thresh: #Separating starburst galaxies from galaxies with out starbursts
+            model_components['lognormal'] = lognormal #Only some galaxies will have starbursts.
+            dblplaw['massformed'] = np.log10(masses[i] - (masses[i]/mass_fraction))
+            model_components['dblplaw'] = dblplaw
+            _galaxy = bagpipes.model_galaxy(model_components, filt_list=goodss_filt_list, spec_wavs=obs_wavs)
+            
+            if not SFH_Only:
+                SB_sfhs.append(_galaxy.sfh.sfh)
+                SB_sfh_list.append(_galaxy.sfh.sfh[0])
+                SB_spectra.append(_galaxy.spectrum)
+                SB_mass.append(masses[i])
+                
+            lognormsfh.append(_galaxy.sfh.component_sfrs['lognormal'])
+            bheights.append(ledds[i])
+            TimesMasses.append({'BurstTime':time_lgnl, 'PwrLawTime':time_dblp, 
+                                'BurstMass':lognormal['massformed'], 'PwrLawMass':dblplaw['massformed']})
+        elif No_SB: #Galaxies without starbursts
+            dblplaw['massformed'] = np.log10(masses[i])
+            model_components['dblplaw'] = dblplaw
+            _galaxy = bagpipes.model_galaxy(model_components, filt_list=goodss_filt_list, spec_wavs=obs_wavs)
+            NSB_sfhs.append(_galaxy.sfh.sfh)
+            NSB_sfh_list.append(_galaxy.sfh.sfh[0])
+            NSB_spectra.append(_galaxy.spectrum)
+            NSB_mass.append(masses[i])
+    
+    Time = (_galaxy.sfh.age_of_universe - _galaxy.sfh.ages)
+    Time_Gyr = Time*10**-9
+    SFH_Dic = {'Time':Time, 'Galaxy':_galaxy, 'lognormlist':lognormsfh, 'AccRates':bheights, 'TimesMasses':TimesMasses}
+    
+    if not SFH_Only:
+        SB_Data = {'SB_mass':SB_mass, 'SB_sfh_list':SB_sfh_list, 'SB_sfhs':SB_sfhs, 'SB_spectra':SB_spectra, 'Time':Time_Gyr, 
+                  'Model_Components':model_components}
+    
+    if SFH_Only:
+        return SFH_Dic
+    elif not SFH_Only:
+        Data = MainSequenceData(SB_Data, SFH_Dic, Save = Save_Data)
+        out = {'Data':Data, 'SB_Data':SB_Data, 'SFH_Data':SFH_Dic}
+        return out
+
+
+
 
 
 
