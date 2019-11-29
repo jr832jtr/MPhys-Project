@@ -193,10 +193,10 @@ def Z_Calc(Time):
 
 
 
-def Generate_AGN(AGN_Type, AoU, LognormSFHs, BurstHeights, BurstWidth = 2e8, Fmax = 10, DownTime = 5, t_delay = 2e8):
+def Generate_AGN(AoU, LognormSFHs, BurstHeights, AGN_Params):
     
     AGNs = ['Probabilistic', 'Delay', 'Random']
-    if AGN_Type not in AGNs:
+    if AGN_Params['AGN_Type'] not in AGNs:
         raise Exception("ERROR: AGN_Type should either be \'Probabilistic\', \'Delay\' or \'Random\'!")
     
     Time = AoU #raw time data from bagpipes
@@ -206,7 +206,7 @@ def Generate_AGN(AGN_Type, AoU, LognormSFHs, BurstHeights, BurstWidth = 2e8, Fma
     Column_Names = {0:'Universe Time'}
     TriggerTimes = []
     
-    if AGN_Type == 'Probabilistic':
+    if AGN_Params['AGN_Type'] == 'Probabilistic':
         for i in range(len(LognormSFHs)): #iterate through all starbursts
             _df = pd.DataFrame() #to handle data
             _df['Time'], _df['Flux'] = T2, LognormSFHs[i][Time > 0.0][::-1]
@@ -220,7 +220,12 @@ def Generate_AGN(AGN_Type, AoU, LognormSFHs, BurstHeights, BurstWidth = 2e8, Fma
             if len(T) > len(_df['Flux']):
                 T = T[:-1]
 
-            _t, _agn, _triggertimes = Lifetimes.probabilistic_lognorm(np.array(_df['Time']), np.array(_df['Flux']), bheights[i], BurstWidth, f_max = max(_df['Flux'])*Fmax, downtime = DownTime, randomheight = False, ttype = 2, Time = T)
+            _t, _agn, _triggertimes = Lifetimes.probabilistic_lognorm(np.array(_df['Time']), 
+                                                                      np.array(_df['Flux']), bheights[i], 
+                                                                      AGN_Params['BurstWidth'], 
+                                                                      f_max = max(_df['Flux'])*AGN_Params['Fmax'], 
+                                                                      downtime = AGN_Params['DownTime'], randomheight = False, 
+                                                                      ttype = 2, Time = T)
         
             TriggerTimes.append(_triggertimes)
             _df2 = pd.DataFrame({'AGN Time': T, 'AGN Flux': _agn}).set_index(_df['Flux'].index)
@@ -234,10 +239,11 @@ def Generate_AGN(AGN_Type, AoU, LognormSFHs, BurstHeights, BurstWidth = 2e8, Fma
         
         return bagpipes_df, TriggerTimes
         
-    if AGN_Type == 'Delay':
+    if AGN_Params['AGN_Type'] == 'Delay':
         for i in range(len(LognormSFHs)):
-            _t, _f = Lifetimes.delay(T2, LognormSFHs[i][Time > 0.0][::-1], t_delay = t_delay)
-            _df = pd.DataFrame(data = {'SFH':LognormSFHs[i][Time > 0.0][::-1], 'AGN Time':_t + t_delay, 'AGN Rate':_f})
+            _t, _f = Lifetimes.delay(T2, LognormSFHs[i][Time > 0.0][::-1], t_delay = AGN_Params['Delay'])
+            _df = pd.DataFrame(data = {'SFH':LognormSFHs[i][Time > 0.0][::-1], 
+                                       'AGN Time':_t + AGN_Params['Delay'], 'AGN Rate':_f})
             bagpipes_df = pd.concat([bagpipes_df, _df], ignore_index = True, axis = 1)
             Column_Names[1 + i*3] = 'SFH {}'.format(i)
             Column_Names[2 + i*3] = 'AGN Time {}'.format(i)
@@ -247,28 +253,79 @@ def Generate_AGN(AGN_Type, AoU, LognormSFHs, BurstHeights, BurstWidth = 2e8, Fma
         
         return bagpipes_df
     
-    #if AGN_Type == 'Random':
+    if AGN_Params['AGN_Type'] == 'Random':
+        for i in range(len(LognormSFHs)):
+            _df = pd.DataFrame()
+            _df['Time'], _df['Flux'] = T2, LognormSFHs[i][Time > 0.0][::-1]
+            CutOff = _df[_df['Time'] > (AGN_Params['TimesMasses'][i]['BurstTime']*10**9) 
+                         - AGN_Params['Delta T Min']].iloc[0, :].name #selects range for random bursts to occur
+            _df = _df.iloc[CutOff:, :]
+            
+            _agn, _triggertimes = Lifetimes.random_burst(max(np.array(_df['Time'])), AGN_Params['Delta T'], 
+                                                                 AGN_Params['DownTime'], AGN_Params['BurstLength'],
+                                                                 bheights[i], bursttype = 'lognorm', 
+                                                                 t_min = (AGN_Params['TimesMasses'][i]['BurstTime']*10**9)
+                                                                 - AGN_Params['Delta T Min'], BurstTimes=True)
+            TriggerTimes.append(_triggertimes)
+            _df2 = pd.DataFrame({'AGN Time': _agn[0], 'AGN Flux': _agn[1]})
+            bagpipes_df = pd.concat([bagpipes_df, _df['Flux'], _df2], ignore_index = True, axis = 1)
+            
+            Column_Names[1 + i*3] = 'SFH {}'.format(i)
+            Column_Names[2 + i*3] = 'AGN Time {}'.format(i)
+            Column_Names[3 + i*3] = 'AGN AR {}'.format(i)
+            
+        bagpipes_df.rename(columns = Column_Names, inplace = True)
         
-        
+        return bagpipes_df, TriggerTimes
         
         
 def AGN_Periods(AGN_Type, SFHs_df, TriggerTimes, num, thresh, Scale, AoU, show = False):
     
-    if AGN_Type == 'delay':
+    if AGN_Type == 'Delay':
         return [np.array(SFHs_df[SFHs_df['AGN AR {}'.format(num)] > 0.0]['AGN Time {}'.format(num)])]
     
-    burst_list, AGN_periods = [], []
+    AGN_periods = []
+    AGN_starts = []
+    AGN_ends1, AGN_ends2 = [], []
+    diff_filter = []
+    Start = []
     j = 0
     
     #find all points which lie above some thresh val. allows to identify separate periods of agn activity
     num_arr = np.where((max(SFHs_df['AGN AR {}'.format(num)].dropna())/thresh) < 
                        SFHs_df['AGN AR {}'.format(num)].dropna())[0]
     
-
-    for i in range(len(num_arr) - 1): #find indices of points where agn activity 'dies'
-        if num_arr[i + 1] - num_arr[i] > 1:
-            burst_list.append(num_arr[i])
-            
+    if AGN_Type == 'Random':
+        fig = plt.figure()
+        ax = plt.subplot()
+        ax.plot(SFHs_df['Universe Time'], SFHs_df['SFH {}'.format(num)], SFHs_df['AGN Time {}'.format(num)], 
+                SFHs_df['AGN AR {}'.format(num)]/Scale)
+        for i in range(len(TriggerTimes[num])):
+            diff_filter = []
+            for j in range(len(SFHs_df.iloc[:, 2 + 3*num])):
+                diff_filter.append(abs(SFHs_df.iloc[j, 2 + 3*num] - TriggerTimes[num][i]))
+            ind = diff_filter.index(min(diff_filter))
+            print(ind)
+            if (SFHs_df.iloc[ind, 2 + 3*num]) > (max(SFHs_df['AGN AR {}'.format(num)].dropna())/thresh):
+                Start.append(TriggerTimes[num][i])
+                ax.axvline(TriggerTimes[num][i])
+        for i in range(len(num_arr) - 1):
+            if (num_arr[i + 1] - num_arr[i]) > 1 or (num_arr[i] == num_arr[-2]):
+                ind = SFHs_df.iloc[:, 2 + 3*num].dropna().index[0] + num_arr[i]
+                AGN_ends1.append(SFHs_df[ind, 2 + 3*num])
+                ax.axvline(SFHs_df[ind, 2 + 3*num])
+        for i in range(len(Start)):
+            diff_list1 = []
+            for j in range(len(SFHs_df['Universe Time'])):
+                diff_list1.append([abs(SFHs_df.iloc[j, 0] - Start[i])])
+            AGN_starts.append(diff_list1.index(min(diff_list1)))
+        for i in range(len(AGN_ends1)):
+            diff_list2 = []
+            for j in range(len(SFhs_df['Universe Time'])):
+                diff_list2.append(abs(SFHs_df.iloc[j, 0] - AGN_ends1[i]))
+            AGN_ends2.append(diff_list2.index(min(diff_list2)))
+        plt.show()    
+    
     if show:
         fig = plt.figure()
         ax = plt.subplot()
