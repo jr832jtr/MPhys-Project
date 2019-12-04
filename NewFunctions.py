@@ -4,7 +4,10 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import scipy.stats as scs
 import bagpipes
+from scipy.integrate import simps
+from scipy.interpolate import interp1d
 from scipy import optimize
+from astropy.cosmology import FlatLambdaCDM
 
 def plot_marker(point, index, c, SubPlots, Graph = True):
     
@@ -139,30 +142,16 @@ def FindCorr(Coeffs, k, tscale, line = True):
     size = (tscale - 100)/len(Coeffs)
     
     spearlist = []
-    difflist = []
     meanlist = []
-    maxlist = []
-    minlist = []
-    rankmax = []
-    rankmin = []
-    ranks = []
 
     for i in range(len(Coeffs)):
         spearlist.append(Coeffs[i])
-
-    #for i in range(len(spearlist) - 1):
-    #    difflist.append(abs(spearlist[i + 1] - spearlist[i]))
     
     for i in range(len(spearlist) - (k + 1)):
-        #meanlist.append([np.mean(difflist[:i + k]), np.mean(difflist[i + k:]), i + k + 1])
         meanlist.append([scs.linregress(Coeffs[i:i + k])[0], scs.linregress(Coeffs[i + k:i + 2*k])[0], i + k + 1])
         
     _df = pd.DataFrame(meanlist, columns = ['Mean Below Point', 'Mean Above Point', 'Point'])
     _df.dropna(thresh = 3, inplace = True)
-    max_val = _df.max(axis = 0)[0]
-    min_val = _df.min(axis = 0)[1]
-    indmax = _df.iloc[:, 0][_df.iloc[:, 0] == max_val].index.tolist()[0]
-    indmin = _df.iloc[:, 1][_df.iloc[:, 1] == min_val].index.tolist()[0]
     _df = _df.sort_values(by = 'Mean Below Point', ascending = False).reset_index().drop('index', axis = 1)
     _df['Rank Max'] = _df.index + 1
     _df = _df.sort_values(by = 'Mean Above Point').reset_index().drop('index', axis = 1)
@@ -180,12 +169,13 @@ def FindCorr(Coeffs, k, tscale, line = True):
     
     
 def Z_Calc(Time):
+    cosmo = FlatLambdaCDM(H0=70., Om0=0.3)
     forcalc_x = []
     forcalc_y = []
 
     for i in range(100):
         forcalc_y.append(0.01*(i + 1))
-        forcalc_x.append(Lifetimes.MyCosmology.cosmocal(0.01*(i + 1))['ageAtZ'])
+        forcalc_x.append(cosmo.age(0.01*(i + 1)).value)
     
     curve = optimize.curve_fit(lambda t,a,b,c: a*t**-b + c,  forcalc_x,  forcalc_y, p0 = (2, 1,0.5))
     
@@ -210,7 +200,7 @@ def Generate_AGN(AoU, LognormSFHs, BurstHeights, AGN_Params):
         for i in range(len(LognormSFHs)): #iterate through all starbursts
             _df = pd.DataFrame() #to handle data
             _df['Time'], _df['Flux'] = T2, LognormSFHs[i][Time > 0.0][::-1]
-            CutOff = _df[_df['Flux'] > 3e-4].iloc[0, :].name #cutoff stops unphysical agn activity occuring
+            CutOff = _df[_df['Flux'] > max(_df['Flux'])/1e4].iloc[0, :].name #cutoff stops unphysical agn activity occuring
             
             _df = _df.iloc[CutOff:, :]
             step = (_df['Time'].iloc[-1] - _df['Time'].iloc[0])/len(_df['Time'])
@@ -218,7 +208,7 @@ def Generate_AGN(AoU, LognormSFHs, BurstHeights, AGN_Params):
             #reproduce time data in non-log format so agn are not distorted
         
             if len(T) > len(_df['Flux']):
-                T = T[:-1]
+                T = T[:-1] #avoids mismatches in length due to rounding errors of np.arange. No harm done as bagpipes time is the dictator here. 
 
             _t, _agn, _triggertimes = Lifetimes.probabilistic_lognorm(np.array(_df['Time']), 
                                                                       np.array(_df['Flux']), bheights[i], 
@@ -241,7 +231,7 @@ def Generate_AGN(AoU, LognormSFHs, BurstHeights, AGN_Params):
         
     if AGN_Params['AGN_Type'] == 'Delay':
         for i in range(len(LognormSFHs)):
-            _t, _f = Lifetimes.delay(T2, LognormSFHs[i][Time > 0.0][::-1], t_delay = AGN_Params['Delay'])
+            _t, _f = Lifetimes.delay(T2, LognormSFHs[i][Time > 0.0][::-1], t_delay = AGN_Params['Delay'], scale = bheights[i])
             _df = pd.DataFrame(data = {'SFH':LognormSFHs[i][Time > 0.0][::-1], 
                                        'AGN Time':_t + AGN_Params['Delay'], 'AGN Rate':_f})
             bagpipes_df = pd.concat([bagpipes_df, _df], ignore_index = True, axis = 1)
@@ -282,11 +272,16 @@ def Generate_AGN(AoU, LognormSFHs, BurstHeights, AGN_Params):
 def AGN_Periods(AGN_Type, SFHs_df, TriggerTimes, num, thresh, Scale, AoU, show = False):
     
     if AGN_Type == 'Delay':
-        return [np.array(SFHs_df[SFHs_df['AGN AR {}'.format(num)] > 0.0]['AGN Time {}'.format(num)])]
+        ind = SFHs_df[SFHs_df['AGN AR {}'.format(num)] > max(SFHs_df['AGN AR {}'.format(num)])/100].index[0]
+        SFHs_df = SFHs_df.iloc[ind:, :]
+        return [np.array(SFHs_df['AGN Time {}'.format(num)])]
+    
+    
     
     AGN_periods = []
-    AGN_starts = []
-    AGN_ends1, AGN_ends2 = [], []
+    AGN_ends= []
+    indstarts, indends = [], []
+    indon, indoff = [], []
     diff_filter = []
     Start = []
     j = 0
@@ -296,67 +291,92 @@ def AGN_Periods(AGN_Type, SFHs_df, TriggerTimes, num, thresh, Scale, AoU, show =
                        SFHs_df['AGN AR {}'.format(num)].dropna())[0]
     
     if AGN_Type == 'Random':
-        fig = plt.figure()
-        ax = plt.subplot()
-        ax.plot(SFHs_df['Universe Time'], SFHs_df['SFH {}'.format(num)], SFHs_df['AGN Time {}'.format(num)], 
-                SFHs_df['AGN AR {}'.format(num)]/Scale)
+        if show:
+            fig = plt.figure()
+            ax = plt.subplot()
+            
+            ax.plot(SFHs_df['Universe Time'], SFHs_df['SFH {}'.format(num)], 
+                    SFHs_df['AGN Time {}'.format(num)], 
+                    SFHs_df['AGN AR {}'.format(num)]/Scale)
+            ax.axhline(y = max(SFHs_df['AGN AR {}'.format(num)].dropna())/(thresh*Scale))
+            
         for i in range(len(TriggerTimes[num])):
             diff_filter = []
             for j in range(len(SFHs_df.iloc[:, 2 + 3*num])):
                 diff_filter.append(abs(SFHs_df.iloc[j, 2 + 3*num] - TriggerTimes[num][i]))
             ind = diff_filter.index(min(diff_filter))
-            print(ind)
-            if (SFHs_df.iloc[ind, 2 + 3*num]) > (max(SFHs_df['AGN AR {}'.format(num)].dropna())/thresh):
+            if (SFHs_df.iloc[ind, 3 + 3*num]) < (max(SFHs_df['AGN AR {}'.format(num)].dropna())/thresh):
                 Start.append(TriggerTimes[num][i])
                 ax.axvline(TriggerTimes[num][i])
+                indon.append(ind)
+                
         for i in range(len(num_arr) - 1):
             if (num_arr[i + 1] - num_arr[i]) > 1 or (num_arr[i] == num_arr[-2]):
-                ind = SFHs_df.iloc[:, 2 + 3*num].dropna().index[0] + num_arr[i]
-                AGN_ends1.append(SFHs_df[ind, 2 + 3*num])
-                ax.axvline(SFHs_df[ind, 2 + 3*num])
+                ind1 = SFHs_df['AGN AR {}'.format(num)].dropna().index[0] + num_arr[i]
+                indoff.append(ind1)
+                AGN_ends.append(SFHs_df.iloc[ind1, 2 + 3*num])
+                ax.axvline(SFHs_df.iloc[ind1, 2 + 3*num])
+                
         for i in range(len(Start)):
             diff_list1 = []
-            for j in range(len(SFHs_df['Universe Time'])):
-                diff_list1.append([abs(SFHs_df.iloc[j, 0] - Start[i])])
-            AGN_starts.append(diff_list1.index(min(diff_list1)))
-        for i in range(len(AGN_ends1)):
             diff_list2 = []
-            for j in range(len(SFhs_df['Universe Time'])):
-                diff_list2.append(abs(SFHs_df.iloc[j, 0] - AGN_ends1[i]))
-            AGN_ends2.append(diff_list2.index(min(diff_list2)))
-        plt.show()    
-    
-    if show:
-        fig = plt.figure()
-        ax = plt.subplot()
-        
-        ax.plot(SFHs_df['Universe Time'], SFHs_df['SFH {}'.format(num)], 
-                SFHs_df['AGN Time {}'.format(num)], 
-                SFHs_df['AGN AR {}'.format(num)]/Scale)
-        ax.axhline(y = max(SFHs_df['AGN AR {}'.format(num)].dropna())/(thresh*Scale))
-        
-    for i in range(len(num_arr) - 1): #find indices of points where agn activity 'dies'
-        if (num_arr[i + 1] - num_arr[i]) > 1 or (num_arr[i] == num_arr[-2]):
-            ind = SFHs_df.iloc[:, 2 + 3*num].dropna().index[0] + num_arr[i] #rectifies the index displacement caused 'np.where'
-        
-            #finds number of steps between agn on and off using bagpipes source code
-            AGN_Start = SFHs_df['Universe Time'][np.array(SFHs_df['Universe Time']) 
-                                                 == TriggerTimes[num][j]].index[0]
-            AGN_End = AGN_Start + int((np.log10(AoU - SFHs_df.iloc[ind, 2 + 3*num]) 
-                                       - np.log10(AoU - TriggerTimes[num][j]))/-0.0025) 
-            AGN_periods.append(list(SFHs_df.iloc[AGN_Start:AGN_End, 0]))
+            for j in range(len(SFHs_df['Universe Time'])):
+                diff_list1.append(abs(SFHs_df.iloc[j, 0] - Start[i]))
+                diff_list2.append(abs(SFHs_df.iloc[j, 0] - AGN_ends[i]))
+            indstarts.append(diff_list1.index(min(diff_list1)))
+            indends.append(diff_list2.index(min(diff_list2)))
             
-            if show:
-                ax.axvline(x = SFHs_df.iloc[AGN_Start:AGN_End, 0].iloc[0])
-                ax.axvline(x = SFHs_df.iloc[AGN_Start:AGN_End, 0].iloc[-1])
+        indstarts.sort()
+        indends.sort()
+        indon.sort()
+        indoff.sort()
+        
+        for i in range(len(indstarts)):
+            AGN_periods.append(list(SFHs_df.iloc[indon[i]:indoff[i], 2 + 3*num]))
+            
+        
+    if AGN_Type == 'Probabilistic':
+        if show:
+            fig = plt.figure()
+            ax = plt.subplot()
+        
+            ax.plot(SFHs_df['Universe Time'], SFHs_df['SFH {}'.format(num)], 
+                    SFHs_df['AGN Time {}'.format(num)], 
+                    SFHs_df['AGN AR {}'.format(num)]/Scale)
+            ax.axhline(y = max(SFHs_df['AGN AR {}'.format(num)].dropna())/(thresh*Scale))
+            
+        for i in range(len(TriggerTimes[num])):
+            diff_list = []
+            for j in range(len(SFHs_df['AGN Time {}'.format(num)])):
+                diff_list.append(abs(SFHs_df.iloc[j, 2 + 3*num] - TriggerTimes[num][i]))
+            AGNon = diff_list.index(np.nanmin(diff_list))
+            Start.append(AGNon)
+            
+        j = 0
+        
+        for i in range(len(num_arr) - 1): #find indices of points where agn activity 'dies'
+            if (num_arr[i + 1] - num_arr[i]) > 1 or (num_arr[i] == num_arr[-2]):
+                ind = SFHs_df.iloc[:, 2 + 3*num].dropna().index[0] + num_arr[i] #rectifies the index displacement caused 'np.where'
+                
+                #finds number of steps between agn on and off using bagpipes source code- POSSIBLY UNNECESSARY
+                AGN_Start = SFHs_df['Universe Time'][np.array(SFHs_df['Universe Time']) 
+                                                     == TriggerTimes[num][j]].index[0]
+                AGN_End = AGN_Start + int((np.log10(AoU - SFHs_df.iloc[ind, 2 + 3*num]) 
+                                           - np.log10(AoU - TriggerTimes[num][j]))/-0.0025) 
+                #AGN_periods.append(list(SFHs_df.iloc[AGN_Start:AGN_End, 0]))
+                AGN_periods.append(list(SFHs_df.iloc[Start[j]:ind, 2 + 3*num]))
+            
+                if show:
+                    ax.axvline(x = SFHs_df.iloc[AGN_Start:AGN_End, 0].iloc[0])
+                    ax.axvline(x = SFHs_df.iloc[AGN_Start:AGN_End, 0].iloc[-1])
 
-            j += 1
+                j += 1
             
-            try:
-                if SFHs_df.iloc[ind, 2 + 3*num] > TriggerTimes[num][j]:
-                    j += 1
-            except IndexError:
-                pass
+                try:
+                    if SFHs_df.iloc[ind, 2 + 3*num] > TriggerTimes[num][j]:
+                        j += 1
+                except IndexError:
+                    pass
         
     if show:
         plt.show()
@@ -553,5 +573,54 @@ def Generate_SFHs(WL, AGN_df, SB_Prob, Gal_Params, SFH_Only = True, No_SB = Fals
 
 
 
-
-
+def Mass_Calculator(init_z, obs_z, sfh, number, n, T_min):
+    cosmol = FlatLambdaCDM(H0=70., Om0=0.3)
+    age = cosmol.age(init_z).value*1e9
+    #point = MyCosmology.cosmocal(obs_z)['ageAtZ']*1e9
+    Mass, Time = [], []
+    SFHs = sfh['TimesMasses'][number]
+    
+    if T_min is None:
+        peak_time = SFHs['BurstTime']*1e9
+        tmin = peak_time - 4e8
+        deltat = (age - tmin)/(n)
+    elif T_min:
+        tmin = T_min
+        deltat = (age - tmin)/(n)
+    
+    for i in range(n):
+        x = sfh['Time'][sfh['Time'] > (tmin + i*deltat)]
+        y = sfh['lognormlist'][number][sfh['Time'] > (tmin + i*deltat)]
+        Mass.append(simps(y, x)*-1)
+        Time.append(tmin + i*deltat)
+    
+    _f = interp1d(Time, max(Mass) - Mass)
+    
+    return _f(obs_z)/max(Mass)
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
