@@ -81,9 +81,6 @@ class Active_Galaxy():
                 _galaxy = bagpipes.model_galaxy(model_components, filt_list=self.Filters, spec_wavs=self.Obs_Wavs)
                 AGN_ON_Spectras.append(_galaxy.spectrum)
                 
-                if j == 0:
-                    _galaxy.sfh.plot()
-                
         return AGN_ON_Spectras
                 
                 
