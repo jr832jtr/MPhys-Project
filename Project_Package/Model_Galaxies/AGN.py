@@ -116,15 +116,23 @@ def Generate_AGN(AoU, LognormSFHs, BurstHeights, AGN_Params):
 def AGN_Periods(AGN_Type, SFHs_df, TriggerTimes, num, thresh, Scale, AoU, show = False):
     
     if AGN_Type == 'Delay':
+        fig = plt.figure()
+        ax = plt.subplot()
+        
         ind = SFHs_df[SFHs_df['AGN AR {}'.format(num)] > max(SFHs_df['AGN AR {}'.format(num)])/100].index[0]
         SFHs_df = SFHs_df.iloc[ind:, :]
+        
+        ax.plot(SFHs_df['Universe Time'], SFHs_df['SFH {}'.format(num)], 
+                SFHs_df['AGN Time {}'.format(num)], SFHs_df['AGN AR {}'.format(num)]/Scale)
+        if show:
+            plt.show()
         return [np.array(SFHs_df['AGN Time {}'.format(num)])]
     
     
     
     AGN_periods = []
     AGN_ends= []
-    indstarts, indends = [], []
+    indstarts = []
     indon, indoff = [], []
     diff_filter = []
     Start = []
@@ -163,15 +171,15 @@ def AGN_Periods(AGN_Type, SFHs_df, TriggerTimes, num, thresh, Scale, AoU, show =
                 
         for i in range(len(Start)):
             diff_list1 = []
-            diff_list2 = []
+            #diff_list2 = []
             for j in range(len(SFHs_df['Universe Time'])):
                 diff_list1.append(abs(SFHs_df.iloc[j, 0] - Start[i]))
-                diff_list2.append(abs(SFHs_df.iloc[j, 0] - AGN_ends[i]))
+                #diff_list2.append(abs(SFHs_df.iloc[j, 0] - AGN_ends[i]))
             indstarts.append(diff_list1.index(min(diff_list1)))
-            indends.append(diff_list2.index(min(diff_list2)))
+            #indends.append(diff_list2.index(min(diff_list2)))
             
-        indstarts.sort()
-        indends.sort()
+        #indstarts.sort()
+        #indends.sort()
         indon.sort()
         indoff.sort()
         
