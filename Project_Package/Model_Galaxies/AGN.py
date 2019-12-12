@@ -35,7 +35,7 @@ def Generate_AGN(AoU, LognormSFHs, BurstHeights, AGN_Params):
     
     Time = AoU #raw time data from bagpipes
     bheights = BurstHeights
-    T2 = Time[Time > 0][::-1] #ensuring time is non-negative, and increasing
+    T2 = Time[Time > 0][::-1] #ensuring time is non-negative and increasing
     bagpipes_df = pd.DataFrame({'Time':T2})
     Column_Names = {0:'Universe Time'}
     TriggerTimes = []
@@ -113,22 +113,31 @@ def Generate_AGN(AoU, LognormSFHs, BurstHeights, AGN_Params):
         return bagpipes_df, TriggerTimes
         
         
-def AGN_Periods(AGN_Type, SFHs_df, TriggerTimes, num, thresh, Scale, AoU, show = False):
+def AGN_Periods(AGN_Type, SFHs_df, TriggerTimes, num, thresh, Scale, AoU, Res, show = False):
+    
+    TimeStep = AoU/Res
     
     if AGN_Type == 'Delay':
-        fig = plt.figure()
-        ax = plt.subplot()
+        
         
         ind = SFHs_df[SFHs_df['AGN AR {}'.format(num)] > max(SFHs_df['AGN AR {}'.format(num)])/100].index[0]
         SFHs_df = SFHs_df.iloc[ind:, :]
         
-        ax.plot(SFHs_df['Universe Time'], SFHs_df['SFH {}'.format(num)], 
-                SFHs_df['AGN Time {}'.format(num)], SFHs_df['AGN AR {}'.format(num)]/Scale)
         if show:
+            fig = plt.figure()
+            ax = plt.subplot()
+            ax.plot(SFHs_df['Universe Time'], SFHs_df['SFH {}'.format(num)], 
+                SFHs_df['AGN Time {}'.format(num)], SFHs_df['AGN AR {}'.format(num)]/Scale)
             plt.show()
-        return [np.array(SFHs_df['AGN Time {}'.format(num)])]
-    
-    
+            
+        AGN_on = min(SFHs_df['AGN Time {}'.format(num)].dropna())
+        AGN_off = max(SFHs_df['AGN Time {}'.format(num)].dropna())
+        No_Points = int((AGN_off - AGN_on)/TimeStep)
+        DeltaT = (AGN_off - AGN_on)/No_Points
+        
+        Burst = np.arange(AGN_on, AGN_off, DeltaT)
+        
+        return [Burst]
     
     AGN_periods = []
     AGN_ends= []
@@ -143,10 +152,10 @@ def AGN_Periods(AGN_Type, SFHs_df, TriggerTimes, num, thresh, Scale, AoU, show =
                        SFHs_df['AGN AR {}'.format(num)].dropna())[0]
     
     if AGN_Type == 'Random':
-        if show:
-            fig = plt.figure()
-            ax = plt.subplot()
-            
+        fig = plt.figure()
+        ax = plt.subplot()
+        
+        if show:            
             ax.plot(SFHs_df['Universe Time'], SFHs_df['SFH {}'.format(num)], 
                     SFHs_df['AGN Time {}'.format(num)], 
                     SFHs_df['AGN AR {}'.format(num)]/Scale)
@@ -159,32 +168,36 @@ def AGN_Periods(AGN_Type, SFHs_df, TriggerTimes, num, thresh, Scale, AoU, show =
             ind = diff_filter.index(min(diff_filter))
             if (SFHs_df.iloc[ind, 3 + 3*num]) < (max(SFHs_df['AGN AR {}'.format(num)].dropna())/thresh):
                 Start.append(TriggerTimes[num][i])
-                ax.axvline(TriggerTimes[num][i])
                 indon.append(ind)
+                if show:
+                    ax.axvline(TriggerTimes[num][i])
                 
         for i in range(len(num_arr) - 1):
             if (num_arr[i + 1] - num_arr[i]) > 1 or (num_arr[i] == num_arr[-2]):
                 ind1 = SFHs_df['AGN AR {}'.format(num)].dropna().index[0] + num_arr[i]
                 indoff.append(ind1)
                 AGN_ends.append(SFHs_df.iloc[ind1, 2 + 3*num])
-                ax.axvline(SFHs_df.iloc[ind1, 2 + 3*num])
+                if show:
+                    ax.axvline(SFHs_df.iloc[ind1, 2 + 3*num])
                 
         for i in range(len(Start)):
             diff_list1 = []
-            #diff_list2 = []
             for j in range(len(SFHs_df['Universe Time'])):
                 diff_list1.append(abs(SFHs_df.iloc[j, 0] - Start[i]))
-                #diff_list2.append(abs(SFHs_df.iloc[j, 0] - AGN_ends[i]))
             indstarts.append(diff_list1.index(min(diff_list1)))
-            #indends.append(diff_list2.index(min(diff_list2)))
-            
-        #indstarts.sort()
-        #indends.sort()
+
         indon.sort()
         indoff.sort()
         
         for i in range(len(indstarts)):
-            AGN_periods.append(list(SFHs_df.iloc[indon[i]:indoff[i], 2 + 3*num]))
+            AGN_on = SFHs_df.iloc[indon[i], 2 + 3*num]
+            AGN_off = SFHs_df.iloc[indoff[i], 2 + 3*num]
+            No_Points = int((AGN_off - AGN_on)/TimeStep)
+            DeltaT = (AGN_off - AGN_on)/No_Points
+            Bursts = np.arange(AGN_on, AGN_off, DeltaT)
+            AGN_periods.append(Bursts)
+                
+            #AGN_periods.append(list(SFHs_df.iloc[indon[i]:indoff[i], 2 + 3*num]))
             
         
     if AGN_Type == 'Probabilistic':
@@ -209,18 +222,26 @@ def AGN_Periods(AGN_Type, SFHs_df, TriggerTimes, num, thresh, Scale, AoU, show =
         for i in range(len(num_arr) - 1): #find indices of points where agn activity 'dies'
             if (num_arr[i + 1] - num_arr[i]) > 1 or (num_arr[i] == num_arr[-2]):
                 ind = SFHs_df.iloc[:, 2 + 3*num].dropna().index[0] + num_arr[i] #rectifies the index displacement caused 'np.where'
+                AGN_on = SFHs_df.iloc[Start[j], 2 + 3*num]
+                AGN_off = SFHs_df.iloc[ind, 2 + 3*num]
+                No_Points = int((AGN_off - AGN_on)/TimeStep)
+                DeltaT = (AGN_off - AGN_on)/No_Points
+                Bursts = np.arange(AGN_on, AGN_off, DeltaT)
+                AGN_periods.append(Bursts)
                 
                 #finds number of steps between agn on and off using bagpipes source code- POSSIBLY UNNECESSARY
-                AGN_Start = SFHs_df['Universe Time'][np.array(SFHs_df['Universe Time']) 
-                                                     == TriggerTimes[num][j]].index[0]
-                AGN_End = AGN_Start + int((np.log10(AoU - SFHs_df.iloc[ind, 2 + 3*num]) 
-                                           - np.log10(AoU - TriggerTimes[num][j]))/-0.0025) 
+                #AGN_Start = SFHs_df['Universe Time'][np.array(SFHs_df['Universe Time']) 
+                #                                     == TriggerTimes[num][j]].index[0]
+                #AGN_End = AGN_Start + int((np.log10(AoU - SFHs_df.iloc[ind, 2 + 3*num]) 
+                #                           - np.log10(AoU - TriggerTimes[num][j]))/-0.0025) 
                 #AGN_periods.append(list(SFHs_df.iloc[AGN_Start:AGN_End, 0]))
-                AGN_periods.append(list(SFHs_df.iloc[Start[j]:ind, 2 + 3*num]))
+                #AGN_periods.append(list(SFHs_df.iloc[Start[j]:ind, 2 + 3*num]))
             
                 if show:
-                    ax.axvline(x = SFHs_df.iloc[AGN_Start:AGN_End, 0].iloc[0])
-                    ax.axvline(x = SFHs_df.iloc[AGN_Start:AGN_End, 0].iloc[-1])
+                    #ax.axvline(x = SFHs_df.iloc[AGN_Start:AGN_End, 0].iloc[0])
+                    #ax.axvline(x = SFHs_df.iloc[AGN_Start:AGN_End, 0].iloc[-1])
+                    ax.axvline(x = SFHs_df.iloc[Start[j]:ind, 2 + 3*num].iloc[0])
+                    ax.axvline(x = SFHs_df.iloc[Start[j]:ind, 2 + 3*num].iloc[-1])
 
                 j += 1
             
@@ -229,7 +250,7 @@ def AGN_Periods(AGN_Type, SFHs_df, TriggerTimes, num, thresh, Scale, AoU, show =
                         j += 1
                 except IndexError:
                     pass
-        
+
     if show:
         plt.show()
         return AGN_periods

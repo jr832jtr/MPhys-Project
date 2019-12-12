@@ -200,10 +200,9 @@ def Generate_SFHs(WL, AGN_df, SB_Prob, Gal_Params, SFH_Only = True, No_SB = Fals
 
 
 
-def Mass_Calculator(init_z, obs_z, sfh, number, n, T_min):
+def Mass_Calculator(init_z, obs_z, sfh, number, n, T_min, component = 1, dblp = None):
     cosmol = FlatLambdaCDM(H0=70., Om0=0.3)
     age = cosmol.age(init_z).value*1e9
-    #point = MyCosmology.cosmocal(obs_z)['ageAtZ']*1e9
     Mass, Time = [], []
     SFHs = sfh['TimesMasses'][number]
     
@@ -214,6 +213,20 @@ def Mass_Calculator(init_z, obs_z, sfh, number, n, T_min):
     elif T_min:
         tmin = T_min
         deltat = (age - tmin)/(n)
+        
+    if component == 'dblplaw':
+        tau = dblp['tau']*10**9
+        for i in range(n):
+            x = sfh['Time'][sfh['Time'] > (age/(n -1))*i]
+            y = ((x/tau)**dblp['alpha'] + (x/tau)**-dblp['beta'])**-1
+            if (len(x) == 0) or (len(y) == 0):
+                break
+            Mass.append(simps(y, x)*-1)
+            Time.append((age/(n -1))*i)          
+            
+        _f = interp1d(Time, max(Mass) - Mass)
+        
+        return(_f(obs_z)/max(Mass))
     
     for i in range(n):
         x = sfh['Time'][sfh['Time'] > (tmin + i*deltat)]
