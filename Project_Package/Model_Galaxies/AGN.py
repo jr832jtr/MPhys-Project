@@ -151,11 +151,10 @@ def AGN_Periods(AGN_Type, SFHs_df, TriggerTimes, num, thresh, Scale, AoU, Res, s
     num_arr = np.where((max(SFHs_df['AGN AR {}'.format(num)].dropna())/thresh) < 
                        SFHs_df['AGN AR {}'.format(num)].dropna())[0]
     
-    if AGN_Type == 'Random':
-        fig = plt.figure()
-        ax = plt.subplot()
-        
+    if AGN_Type == 'Random':        
         if show:            
+            fig = plt.figure()
+            ax = plt.subplot()
             ax.plot(SFHs_df['Universe Time'], SFHs_df['SFH {}'.format(num)], 
                     SFHs_df['AGN Time {}'.format(num)], 
                     SFHs_df['AGN AR {}'.format(num)]/Scale)
@@ -193,6 +192,8 @@ def AGN_Periods(AGN_Type, SFHs_df, TriggerTimes, num, thresh, Scale, AoU, Res, s
             AGN_on = SFHs_df.iloc[indon[i], 2 + 3*num]
             AGN_off = SFHs_df.iloc[indoff[i], 2 + 3*num]
             No_Points = int((AGN_off - AGN_on)/TimeStep)
+            if No_Points == 0:
+                continue
             DeltaT = (AGN_off - AGN_on)/No_Points
             Bursts = np.arange(AGN_on, AGN_off, DeltaT)
             AGN_periods.append(Bursts)
